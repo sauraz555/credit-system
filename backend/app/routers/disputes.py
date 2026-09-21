@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from app.database import get_db
-from app.models import Dispute, CreditLedger, RecordStatusEnum, AuditLog, Entity
+from app.models import Dispute, CreditLedger, RecordStatusEnum, AuditLog, Entity, User, RoleEnum
+from app.auth import get_current_user, require_roles
+from app.encryption import decrypt_field, compute_blind_index
 
 router = APIRouter(prefix="/api/disputes", tags=["disputes"])
 
@@ -18,7 +20,10 @@ class DisputeUpdate(BaseModel):
     notes: Optional[str] = None
 
 @router.get("")
-def list_disputes(db: Session = Depends(get_db)):
+def list_disputes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.ANALYST))
+):
     """Fetch all statutory disputes under Privacy Act 1988 Part IIIA s20V."""
     disputes = db.query(Dispute).order_by(Dispute.created_at.desc()).all()
     
@@ -58,13 +63,28 @@ def list_disputes(db: Session = Depends(get_db)):
     return results
 
 @router.post("")
-def open_dispute(dispute_in: DisputeCreate, db: Session = Depends(get_db)):
-    # Find entity
+def open_dispute(
+    dispute_in: DisputeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Find entity via ID, blind index, or identifier
+    blind_idx = compute_blind_index(dispute_in.entity_id)
     entity = db.query(Entity).filter(
-        (Entity.id == dispute_in.entity_id) | (Entity.identifier == dispute_in.entity_id)
+        (Entity.id == dispute_in.entity_id) |
+        (Entity.identifier_blind_index == blind_idx) |
+        (Entity.identifier == dispute_in.entity_id)
     ).first()
     
     actual_entity_id = entity.id if entity else dispute_in.entity_id
+    
+    # RBAC: Subject can only dispute their own file
+    if current_user.role == RoleEnum.SUBJECT:
+        if current_user.entity_id != actual_entity_id and current_user.id != actual_entity_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Subjects may only dispute listings on their own credit file."
+            )
     
     # Verify or link ledger record
     ledger = None
@@ -91,7 +111,7 @@ def open_dispute(dispute_in: DisputeCreate, db: Session = Depends(get_db)):
         
     # Audit log
     audit = AuditLog(
-        user_id="SYSTEM",
+        user_id=current_user.id,
         action="CREATE_DISPUTE_SEC_20V",
         target_table="disputes",
         target_id=dispute.id,
@@ -109,7 +129,12 @@ def open_dispute(dispute_in: DisputeCreate, db: Session = Depends(get_db)):
     }
 
 @router.put("/{dispute_id}")
-def update_dispute(dispute_id: str, dispute_in: DisputeUpdate, db: Session = Depends(get_db)):
+def update_dispute(
+    dispute_id: str,
+    dispute_in: DisputeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN))
+):
     dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
     if not dispute:
         raise HTTPException(status_code=404, detail="Dispute not found")
@@ -133,7 +158,7 @@ def update_dispute(dispute_id: str, dispute_in: DisputeUpdate, db: Session = Dep
             
     # Audit log
     audit = AuditLog(
-        user_id="ADMIN_OFFICER", 
+        user_id=current_user.id, 
         action="ADJUDICATE_DISPUTE",
         target_table="disputes",
         target_id=dispute.id,

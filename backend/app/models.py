@@ -49,7 +49,10 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(Enum(RoleEnum), default=RoleEnum.SUBJECT, nullable=False)
-    tenant_id = Column(String, nullable=True) # For providers
+    tenant_id = Column(String, nullable=True) # For providers (e.g. PRV-NAB-001)
+    entity_id = Column(String, nullable=True) # For subjects (e.g. links to Entity.id)
+    totp_secret = Column(String, nullable=True)
+    mfa_enabled = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Entity(Base):
@@ -57,8 +60,9 @@ class Entity(Base):
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     type = Column(Enum(EntityTypeEnum), nullable=False)
-    # ABN/ACN for company, SSN/DriverLicense for individual
-    identifier = Column(String, unique=True, index=True, nullable=False)
+    # Encrypted identifier (ABN/ACN for company, Driver License/Passport for individual)
+    identifier = Column(String, nullable=False)
+    identifier_blind_index = Column(String, index=True, nullable=True)
     basic_info = Column(JSON, default={}) # Name, DOB, Address, etc.
     created_at = Column(DateTime, default=datetime.utcnow)
 

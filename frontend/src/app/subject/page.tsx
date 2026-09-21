@@ -31,7 +31,7 @@ import {
   Renew
 } from '@carbon/icons-react';
 
-export default function CommercialSubjectPage() {
+function CommercialSubjectContent() {
   const searchParams = useSearchParams();
   const queryId = searchParams.get('id') || 'ACN-109-283-912';
 
@@ -367,7 +367,7 @@ export default function CommercialSubjectPage() {
                         </td>
                         <td className="p-3 font-mono text-white">{tx.dbt}</td>
                         <td className="p-3">
-                          <Tag type={tx.pastDue > 0 ? 'yellow' : 'green'} size="sm" className="m-0 font-mono">
+                          <Tag type={tx.pastDue > 0 ? 'magenta' : 'green'} size="sm" className="m-0 font-mono">
                             {tx.trend}
                           </Tag>
                         </td>
@@ -509,7 +509,7 @@ export default function CommercialSubjectPage() {
 
                 {/* Director details cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                  {directors.map(dir => (
+                  {directors.map((dir: any) => (
                     <div key={dir.id} className="bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] p-4">
                       <div className="flex items-center justify-between pb-3 border-b border-[var(--cds-border-subtle)] mb-3">
                         <div>
@@ -632,5 +632,13 @@ export default function CommercialSubjectPage() {
         </Tabs>
       </div>
     </div>
+  );
+}
+
+export default function CommercialSubjectPage() {
+  return (
+    <React.Suspense fallback={<InlineLoading description="Loading commercial credit registry..." />}>
+      <CommercialSubjectContent />
+    </React.Suspense>
   );
 }

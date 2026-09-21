@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from app.models import Base
 
@@ -29,3 +29,16 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Safe lightweight column migration for local SQLite dev database
+    with engine.connect() as conn:
+        for col, tbl, typ in [
+            ("identifier_blind_index", "entities", "VARCHAR"),
+            ("entity_id", "users", "VARCHAR"),
+            ("totp_secret", "users", "VARCHAR"),
+            ("mfa_enabled", "users", "BOOLEAN DEFAULT 0")
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {typ}"))
+                conn.commit()
+            except Exception:
+                pass

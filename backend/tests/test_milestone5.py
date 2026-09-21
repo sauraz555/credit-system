@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.database import SessionLocal
 from app.models import CreditLedger, Entity, Dispute, RecordStatusEnum, RecordTypeEnum, EntityTypeEnum
+from app.auth import create_access_token, RoleEnum
 import datetime
 from app.tasks import run_data_expiry_job
 
@@ -11,6 +12,8 @@ import uuid
 
 def test_dispute_lifecycle():
     db = SessionLocal()
+    token = create_access_token({"sub": "admin-milestone5", "email": "admin@bureau.gov.au", "role": RoleEnum.ADMIN})
+    headers = {"Authorization": f"Bearer {token}"}
     
     # 1. Create a dummy entity
     entity = Entity(type=EntityTypeEnum.INDIVIDUAL, identifier=f"DISPUTE_TEST_{uuid.uuid4().hex[:8]}", basic_info={})
@@ -35,7 +38,7 @@ def test_dispute_lifecycle():
         "ledger_record_id": ledger.id,
         "entity_id": entity.id,
         "notes": "I never missed this payment"
-    })
+    }, headers=headers)
     assert resp.status_code == 200
     dispute_id = resp.json()["dispute_id"]
     
@@ -43,14 +46,11 @@ def test_dispute_lifecycle():
     db.refresh(ledger)
     assert ledger.status == RecordStatusEnum.DISPUTED
     
-    # 4. Resolve dispute via API (UPHELD - means consumer won, record becomes ACTIVE again or removed? Wait, UPHELD means consumer is right. Actually usually UPHELD means consumer is right so it's removed or corrected. Let's look at the implementation we wrote: `ACTIVE if status == UPHELD else RESOLVED`. Actually if consumer's dispute is upheld, the negative record should be removed or marked resolved/invalid. If it's dismissed, it goes back to ACTIVE. Let's just check the DB state changes.)
-    
-    # I wrote: ledger.status = RecordStatusEnum.ACTIVE if dispute_in.status == "UPHELD" else RecordStatusEnum.RESOLVED
-    # Let's say we update to CORRECTED
+    # 4. Resolve dispute via API
     resp2 = client.put(f"/api/disputes/{dispute_id}", json={
         "status": "CORRECTED",
         "notes": "Provider admitted error"
-    })
+    }, headers=headers)
     assert resp2.status_code == 200
     
     db.refresh(ledger)

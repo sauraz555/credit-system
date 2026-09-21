@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Dict, Any, List
 from app.database import get_db
-from app.models import ModelVersion, EntityTypeEnum, AuditLog
+from app.models import ModelVersion, EntityTypeEnum, AuditLog, User, RoleEnum
+from app.auth import get_current_user, require_roles
+from app.encryption import decrypt_field
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -15,7 +17,11 @@ class ModelCreate(BaseModel):
     active: bool = False
 
 @router.post("/models")
-def create_model(model_in: ModelCreate, db: Session = Depends(get_db)):
+def create_model(
+    model_in: ModelCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN))
+):
     if model_in.active:
         # Deactivate current active model
         db.query(ModelVersion).filter(
@@ -35,12 +41,19 @@ def create_model(model_in: ModelCreate, db: Session = Depends(get_db)):
     return {"status": "success", "model_id": model.id}
 
 @router.get("/models")
-def get_models(db: Session = Depends(get_db)):
+def get_models(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.ANALYST))
+):
     models = db.query(ModelVersion).order_by(ModelVersion.created_at.desc()).all()
     return models
 
 @router.post("/backtest")
-def run_backtest(model_id: str, db: Session = Depends(get_db)):
+def run_backtest(
+    model_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.ANALYST))
+):
     """
     Mock endpoint to simulate backtesting.
     In a real system, this would:
@@ -58,12 +71,19 @@ def run_backtest(model_id: str, db: Session = Depends(get_db)):
     }
 
 @router.get("/audit")
-def get_audit_log(db: Session = Depends(get_db)):
+def get_audit_log(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN))
+):
     logs = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(50).all()
     return logs
 
 @router.get("/network")
-def get_director_network(limit_companies: int = 12, db: Session = Depends(get_db)):
+def get_director_network(
+    limit_companies: int = 12,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.ANALYST))
+):
     """Fetch corporate director contagion graph nodes and edges."""
     from app.models import Entity, DirectorLink, Score
     
@@ -75,13 +95,14 @@ def get_director_network(limit_companies: int = 12, db: Session = Depends(get_db
     
     for comp in companies:
         c_score = db.query(Score).filter(Score.entity_id == comp.id).order_by(Score.calculated_at.desc()).first()
-        comp_name = comp.basic_info.get("company_name", f"Company {comp.identifier[:6]}")
+        comp_ident = decrypt_field(comp.identifier)
+        comp_name = comp.basic_info.get("company_name", f"Company {comp_ident[:6] if comp_ident else 'Unknown'}")
         
         nodes.append({
             "id": comp.id,
             "label": comp_name,
             "type": "COMPANY",
-            "identifier": comp.identifier,
+            "identifier": comp_ident,
             "score": c_score.score_value if c_score else 76,
             "risk": "HIGH" if (c_score and c_score.score_value < 50) else "LOW"
         })
@@ -93,12 +114,13 @@ def get_director_network(limit_companies: int = 12, db: Session = Depends(get_db
             if ind:
                 if ind.id not in seen_nodes:
                     ind_score = db.query(Score).filter(Score.entity_id == ind.id).order_by(Score.calculated_at.desc()).first()
-                    ind_name = f"{ind.basic_info.get('first_name', '')} {ind.basic_info.get('last_name', '')}".strip() or f"Director {ind.identifier[:6]}"
+                    ind_ident = decrypt_field(ind.identifier)
+                    ind_name = f"{ind.basic_info.get('first_name', '')} {ind.basic_info.get('last_name', '')}".strip() or f"Director {ind_ident[:6] if ind_ident else 'Unknown'}"
                     nodes.append({
                         "id": ind.id,
                         "label": ind_name,
                         "type": "DIRECTOR",
-                        "identifier": ind.identifier,
+                        "identifier": ind_ident,
                         "score": ind_score.score_value if ind_score else 710,
                         "risk": "HIGH" if (ind_score and ind_score.score_value < 600) else "LOW"
                     })

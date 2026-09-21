@@ -69,6 +69,10 @@ pnpm-debug.log*
 *.sqlite3
 backend/credit_system.db
 credit_system.db
+.env
+.env.*
+.env.local
+backups/
 
 # OS Files
 .DS_Store

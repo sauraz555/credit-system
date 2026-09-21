@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.main import app
 from app.database import init_db, SessionLocal
 from app.models import Entity
+from app.auth import create_access_token, RoleEnum
 
 client = TestClient(app)
 
@@ -26,7 +27,10 @@ class TestScoring(unittest.TestCase):
         if not entity:
             self.skipTest("No entities in DB, run seed_data.py first.")
             
-        response = client.get(f"/api/reports/{entity.id}")
+        token = create_access_token({"sub": "admin-scoring-test", "email": "admin@bureau.gov.au", "role": RoleEnum.ADMIN})
+        headers = {"Authorization": f"Bearer {token}"}
+            
+        response = client.get(f"/api/reports/{entity.id}", headers=headers)
         self.assertEqual(response.status_code, 200)
         
         data = response.json()
@@ -36,7 +40,7 @@ class TestScoring(unittest.TestCase):
         self.assertIn("top_factors", data["score"])
 
         # Also test the force evaluate endpoint
-        eval_resp = client.post(f"/api/scoring/evaluate/{entity.id}")
+        eval_resp = client.post(f"/api/scoring/evaluate/{entity.id}", headers=headers)
         self.assertEqual(eval_resp.status_code, 200)
         self.assertIn("score_value", eval_resp.json())
 

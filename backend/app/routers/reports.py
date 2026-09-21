@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+import json
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from typing import Optional, List, Dict, Any
@@ -9,11 +10,14 @@ from app.models import (
 )
 from app.services.features import update_feature_store
 from app.services.scoring import calculate_and_save_score
+from app.auth import get_current_user, require_roles
+from app.rate_limiter import rate_limit_reports
+from app.encryption import decrypt_field, compute_blind_index
 
 router = APIRouter(prefix="/api", tags=["reports", "scoring"])
 
 def ensure_mock_user(db: Session) -> str:
-    user = db.query(User).filter(User.id == "MOCK_USER_ID").first()
+    user = db.query(User).filter(User.email == "officer@apra-crms.gov.au").first()
     if not user:
         user = User(
             id="MOCK_USER_ID",
@@ -26,22 +30,34 @@ def ensure_mock_user(db: Session) -> str:
             db.commit()
         except Exception:
             db.rollback()
-    return "MOCK_USER_ID"
+    return user.id if user else "SYSTEM"
 
 def find_entity(entity_id: str, db: Session) -> Optional[Entity]:
-    # 1. Exact match on UUID or identifier
-    entity = db.query(Entity).filter(
-        or_(Entity.id == entity_id, Entity.identifier == entity_id)
-    ).first()
+    # 1. Direct match on UUID id
+    entity = db.query(Entity).filter(Entity.id == entity_id).first()
     if entity:
         return entity
         
-    # 2. Match with cleaned identifier (e.g. IND-8842-1994 -> 88421994 or partial)
+    # 2. Match via Blind Index on encrypted identifier
+    blind_idx = compute_blind_index(entity_id)
+    entity = db.query(Entity).filter(Entity.identifier_blind_index == blind_idx).first()
+    if entity:
+        return entity
+        
+    # 3. Match on raw identifier string (for backwards compatibility / unencrypted rows)
+    entity = db.query(Entity).filter(Entity.identifier == entity_id).first()
+    if entity:
+        return entity
+        
+    # 4. Cleaned identifier blind index (e.g. stripped prefixes)
     clean_id = entity_id.replace("-", "").replace("IND", "").replace("ACN", "").replace("ABN", "").strip()
     if clean_id:
-        entity = db.query(Entity).filter(Entity.identifier.contains(clean_id)).first()
+        clean_blind_idx = compute_blind_index(clean_id)
+        entity = db.query(Entity).filter(Entity.identifier_blind_index == clean_blind_idx).first()
         if entity:
             return entity
+            
+    return None
 
     # 3. Fallback: match by name in basic_info
     entity = db.query(Entity).filter(
@@ -119,12 +135,20 @@ def list_entities(
     }
 
 @router.post("/scoring/evaluate/{entity_id}")
-def evaluate_score(entity_id: str, db: Session = Depends(get_db)):
+def evaluate_score(
+    entity_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Force recompute of features and score for an entity."""
     entity = find_entity(entity_id, db)
     if not entity:
         raise HTTPException(status_code=404, detail=f"Entity {entity_id} not found")
         
+    if current_user.role == RoleEnum.SUBJECT:
+        if current_user.entity_id != entity.id and current_user.id != entity.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Cannot score another subject.")
+
     fs = update_feature_store(entity.id, db)
     score = calculate_and_save_score(entity.id, entity.type, fs.features, db)
     
@@ -138,18 +162,32 @@ def evaluate_score(entity_id: str, db: Session = Depends(get_db)):
     }
 
 @router.get("/reports/{entity_id}")
-def get_report(entity_id: str, db: Session = Depends(get_db)):
+def get_report(
+    entity_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Fetch full credit report, returning score, ledger, and director links."""
+    rate_limit_reports(request, current_user.id)
+    
     entity = find_entity(entity_id, db)
     if not entity:
         raise HTTPException(status_code=404, detail=f"Entity '{entity_id}' not found")
         
-    # Log enquiry safely
+    # Subject privacy rule
+    if current_user.role == RoleEnum.SUBJECT:
+        if current_user.entity_id != entity.id and current_user.id != entity.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Subjects may only inspect their own personal credit file."
+            )
+        
+    # Log enquiry attributed to caller
     try:
-        user_id = ensure_mock_user(db)
         enquiry = Enquiry(
             entity_id=entity.id,
-            user_id=user_id,
+            user_id=current_user.id,
             reason="Comprehensive Bureau Credit Assessment (Part IIIA)"
         )
         db.add(enquiry)
@@ -183,12 +221,12 @@ def get_report(entity_id: str, db: Session = Depends(get_db)):
                 ).count()
                 
                 ind_score = db.query(Score).filter(Score.entity_id == ind.id).order_by(Score.calculated_at.desc()).first()
-                
+                decrypted_ind_id = decrypt_field(ind.identifier)
                 directors_data.append({
                     "link_id": link.id,
                     "individual_id": ind.id,
-                    "identifier": ind.identifier,
-                    "name": f"{ind.basic_info.get('first_name', '')} {ind.basic_info.get('last_name', '')}".strip() or ind.identifier,
+                    "identifier": decrypted_ind_id,
+                    "name": f"{ind.basic_info.get('first_name', '')} {ind.basic_info.get('last_name', '')}".strip() or decrypted_ind_id,
                     "role": link.role,
                     "start_date": str(link.start_date),
                     "other_directorships": other_count,
@@ -201,10 +239,11 @@ def get_report(entity_id: str, db: Session = Depends(get_db)):
             comp = db.query(Entity).filter(Entity.id == link.company_entity_id).first()
             if comp:
                 comp_score = db.query(Score).filter(Score.entity_id == comp.id).order_by(Score.calculated_at.desc()).first()
+                decrypted_comp_id = decrypt_field(comp.identifier)
                 directorships_data.append({
                     "company_id": comp.id,
-                    "company_identifier": comp.identifier,
-                    "company_name": comp.basic_info.get("company_name", comp.identifier),
+                    "company_identifier": decrypted_comp_id,
+                    "company_name": comp.basic_info.get("company_name", decrypted_comp_id),
                     "role": link.role,
                     "start_date": str(link.start_date),
                     "paydex_score": comp_score.score_value if comp_score else 75
@@ -214,8 +253,8 @@ def get_report(entity_id: str, db: Session = Depends(get_db)):
         "entity": {
             "id": entity.id,
             "type": entity.type,
-            "identifier": entity.identifier,
-            "basic_info": entity.basic_info,
+            "identifier": decrypt_field(entity.identifier),
+            "basic_info": entity.basic_info if isinstance(entity.basic_info, dict) else (json.loads(decrypt_field(entity.basic_info)) if entity.basic_info else {}),
             "created_at": str(entity.created_at)
         },
         "score": {

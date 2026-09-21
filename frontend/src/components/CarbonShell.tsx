@@ -28,7 +28,8 @@ import {
   Enterprise,
   Upload,
   SettingsAdjust,
-  Time
+  Time,
+  Logout
 } from '@carbon/icons-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -36,6 +37,29 @@ import { usePathname } from 'next/navigation';
 export default function CarbonShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [currentTheme, setCurrentTheme] = useState<'g100' | 'g10'>('g100');
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setUserRole(localStorage.getItem('user_role'));
+      setUserEmail(localStorage.getItem('user_email'));
+    }
+  }, [pathname]);
+
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user_role');
+      localStorage.removeItem('user_email');
+      localStorage.removeItem('user_entity_id');
+      localStorage.removeItem('user_tenant_id');
+      document.cookie = 'auth_token=; path=/; max-age=0';
+      document.cookie = 'auth_role=; path=/; max-age=0';
+      window.location.href = '/login';
+    }
+  };
 
   const toggleTheme = () => {
     const next = currentTheme === 'g100' ? 'g10' : 'g100';
@@ -97,7 +121,6 @@ export default function CarbonShell({ children }: { children: React.ReactNode })
                 <HeaderGlobalAction 
                   aria-label={`Switch to ${currentTheme === 'g100' ? 'g10 Light' : 'g100 Dark'} Theme`}
                   onClick={toggleTheme}
-                  title={`Toggle Theme (Current: ${currentTheme})`}
                 >
                   {currentTheme === 'g100' ? <Light size={20} /> : <Asleep size={20} />}
                 </HeaderGlobalAction>
@@ -110,9 +133,27 @@ export default function CarbonShell({ children }: { children: React.ReactNode })
                     <span className="absolute top-0 right-0 w-2 h-2 bg-[#0f62fe]" />
                   </div>
                 </HeaderGlobalAction>
-                <HeaderGlobalAction aria-label="User Profile: S. Vance (APRA Level 3 Officer)" onClick={() => {}}>
-                  <UserAvatar size={20} />
+                <HeaderGlobalAction aria-label={`User: ${userEmail || 'Guest'} (${userRole || 'Not Authenticated'})`}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 0.25rem' }}>
+                    <UserAvatar size={20} />
+                    {userRole && (
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, background: 'var(--cds-layer-accent-01, #393939)', padding: '2px 6px', borderRadius: '2px' }}>
+                        {userRole}
+                      </span>
+                    )}
+                  </div>
                 </HeaderGlobalAction>
+                {userRole ? (
+                  <HeaderGlobalAction aria-label="Sign Out" onClick={handleLogout}>
+                    <Logout size={20} />
+                  </HeaderGlobalAction>
+                ) : (
+                  <Link href="/login" passHref legacyBehavior>
+                    <HeaderGlobalAction aria-label="Sign In">
+                      <UserAvatar size={20} />
+                    </HeaderGlobalAction>
+                  </Link>
+                )}
               </HeaderGlobalBar>
               
               <SideNav

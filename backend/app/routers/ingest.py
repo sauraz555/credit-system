@@ -1,17 +1,29 @@
 import csv
 import io
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 from typing import List
 
 from app.database import get_db
-from app.models import IngestEvent, CreditLedger, RecordStatusEnum
+from app.models import IngestEvent, CreditLedger, RecordStatusEnum, Entity, User, RoleEnum
 from app.schemas import IngestRecordRequest, BulkIngestResponse
+from app.auth import get_current_user, require_roles
+from app.rate_limiter import rate_limit_ingest
+from app.encryption import compute_blind_index
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 
 def process_record(record_in: IngestRecordRequest, provider_id: str, db: Session) -> None:
+    # Resolve entity_id using direct id, blind index, or identifier
+    entity = db.query(Entity).filter(
+        (Entity.id == record_in.entity_id) |
+        (Entity.identifier_blind_index == compute_blind_index(record_in.entity_id)) |
+        (Entity.identifier == record_in.entity_id)
+    ).first()
+    
+    target_entity_id = entity.id if entity else record_in.entity_id
+
     # 1. Create append-only event log
     event = IngestEvent(
         provider_id=provider_id,
@@ -22,7 +34,7 @@ def process_record(record_in: IngestRecordRequest, provider_id: str, db: Session
     
     # 2. Write to bitemporal ledger
     ledger_entry = CreditLedger(
-        entity_id=record_in.entity_id,
+        entity_id=target_entity_id,
         record_type=record_in.record_type,
         data=record_in.data,
         amount=record_in.amount,
@@ -34,10 +46,15 @@ def process_record(record_in: IngestRecordRequest, provider_id: str, db: Session
     db.add(ledger_entry)
 
 @router.post("/record")
-def ingest_record(record: IngestRecordRequest, db: Session = Depends(get_db)):
-    """Ingest a single record via JSON."""
-    # Assuming provider_id is extracted from a JWT token in a real scenario
-    provider_id = "MOCK_PROVIDER_123" 
+def ingest_record(
+    record: IngestRecordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.PROVIDER))
+):
+    """Ingest a single record via JSON (Requires ADMIN or PROVIDER role)."""
+    rate_limit_ingest(request, current_user.id)
+    provider_id = current_user.tenant_id or "PROVIDER_CREDIT_CORP"
     
     try:
         process_record(record, provider_id, db)
@@ -57,9 +74,16 @@ def ingest_record(record: IngestRecordRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/csv", response_model=BulkIngestResponse)
-def ingest_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Ingest bulk records via CSV."""
-    provider_id = "MOCK_PROVIDER_123"
+def ingest_csv(
+    file: UploadFile = File(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.PROVIDER))
+):
+    """Ingest bulk records via CSV (Requires ADMIN or PROVIDER role)."""
+    if request:
+        rate_limit_ingest(request, current_user.id)
+    provider_id = current_user.tenant_id or "PROVIDER_CREDIT_CORP"
     
     content = file.file.read().decode("utf-8")
     reader = csv.DictReader(io.StringIO(content))
@@ -114,7 +138,11 @@ def ingest_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
     )
 
 @router.get("/events")
-def list_ingest_events(limit: int = 50, db: Session = Depends(get_db)):
+def list_ingest_events(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.PROVIDER))
+):
     """Fetch recent ingestion events for the provider audit log."""
     events = db.query(IngestEvent).order_by(IngestEvent.created_at.desc()).limit(limit).all()
     return [
