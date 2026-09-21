@@ -1,21 +1,133 @@
 version: '3.8'
 
 services:
+  # ==========================================
+  # 1. Primary PostgreSQL Relational Database
+  # ==========================================
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
+    container_name: crms-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: credit_user
-      POSTGRES_PASSWORD: credit_password
-      POSTGRES_DB: credit_db
+      POSTGRES_USER: ${POSTGRES_USER:-crms_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crms_secure_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-credit_system}
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crms_user} -d ${POSTGRES_DB:-credit_system}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+  # ==========================================
+  # 2. Redis Distributed Cache & Task Broker
+  # ==========================================
   redis:
     image: redis:7-alpine
+    container_name: crms-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 3. Core CRMS FastAPI Engine
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: crms-backend
+    restart: unless-stopped
+    command: >
+      sh -c "alembic upgrade head &&
+             python scripts/seed_data.py &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-crms_user}:${POSTGRES_PASSWORD:-crms_secure_pass_2026}@db:5432/${POSTGRES_DB:-credit_system}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-super_secret_jwt_signing_key_production_2026_crms}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      - BLIND_INDEX_KEY=${BLIND_INDEX_KEY:-fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - ENVIRONMENT=production
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ==========================================
+  # 4. Celery Asynchronous Job Worker
+  # ==========================================
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: crms-celery-worker
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-crms_user}:${POSTGRES_PASSWORD:-crms_secure_pass_2026}@db:5432/${POSTGRES_DB:-credit_system}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-super_secret_jwt_signing_key_production_2026_crms}
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      - BLIND_INDEX_KEY=${BLIND_INDEX_KEY:-fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ==========================================
+  # 5. Celery Beat Periodic Scheduler (Expiry & SLA)
+  # ==========================================
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: crms-celery-beat
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-crms_user}:${POSTGRES_PASSWORD:-crms_secure_pass_2026}@db:5432/${POSTGRES_DB:-credit_system}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ==========================================
+  # 6. Carbon Design System Web Frontend
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: crms-frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
 
 volumes:
-  postgres_data:
+  pgdata:
+  redisdata:

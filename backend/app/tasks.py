@@ -70,10 +70,82 @@ def run_data_expiry_job():
     finally:
         db.close()
 
+@celery_app.task
+def check_dispute_sla_alerts():
+    """
+    Statutory Section 20V Dispute Resolution SLA Alert Job:
+    Australian Privacy Act 1988 Part IIIA mandates a 30-day statutory resolution period.
+    Monitors all open/in-progress disputes approaching the 30-day limit (<= 5 days remaining).
+    Emits alerts and records audit events.
+    """
+    import logging
+    from datetime import datetime
+    from app.models import Dispute, AuditLog
+
+    logger = logging.getLogger("crms.tasks.dispute_sla")
+    db: Session = SessionLocal()
+    now = datetime.utcnow()
+    alerts = []
+
+    try:
+        # Check active non-resolved disputes
+        disputes = db.query(Dispute).filter(
+            Dispute.status.in_(["OPEN", "UNDER_REVIEW", "IN_INVESTIGATION", "PENDING"])
+        ).all()
+
+        for d in disputes:
+            lodged_at = d.created_at or now
+            days_elapsed = (now - lodged_at).days
+            days_remaining = 30 - days_elapsed
+
+            if days_remaining <= 5:
+                severity = "BREACH_CRITICAL" if days_remaining <= 0 else "WARNING_URGENT"
+                alert_msg = (
+                    f"CRMS SLA ALERT [{severity}]: Dispute {d.id} for entity {d.entity_id} "
+                    f"has {days_remaining} day(s) remaining of 30-day statutory SLA window! "
+                    f"Current status: {d.status}."
+                )
+                logger.warning(alert_msg)
+                alerts.append({
+                    "dispute_id": d.id,
+                    "entity_id": d.entity_id,
+                    "days_remaining": days_remaining,
+                    "severity": severity,
+                    "message": alert_msg
+                })
+
+                # Record SLA alert into audit log
+                audit = AuditLog(
+                    action="DISPUTE_SLA_ALERT",
+                    target_table="disputes",
+                    target_id=d.id,
+                    details={
+                        "days_remaining": days_remaining,
+                        "days_elapsed": days_elapsed,
+                        "statutory_limit_days": 30,
+                        "severity": severity,
+                        "alert": alert_msg
+                    }
+                )
+                db.add(audit)
+
+        db.commit()
+        return {"alerts_generated": len(alerts), "alerts": alerts}
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        db.close()
+
 # Periodic task schedule
 celery_app.conf.beat_schedule = {
     'daily-expiry-job': {
         'task': 'app.tasks.run_data_expiry_job',
         'schedule': 86400.0, # Run every 24 hours
     },
+    'hourly-dispute-sla-check': {
+        'task': 'app.tasks.check_dispute_sla_alerts',
+        'schedule': 3600.0, # Run every hour
+    },
 }
+
