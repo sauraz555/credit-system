@@ -1,0 +1,134 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* Carbon g100 (Dark default) theme variables */
+:root, [data-carbon-theme="g100"], .cds--g100 {
+  --cds-background: #161616;
+  --cds-layer-01: #262626;
+  --cds-layer-02: #333333;
+  --cds-layer-03: #474747;
+  --cds-layer-accent-01: #393939;
+  --cds-border-subtle: #393939;
+  --cds-border-strong: #6f6f6f;
+  --cds-border-tile: #393939;
+  --cds-text-primary: #f4f4f4;
+  --cds-text-secondary: #c6c6c6;
+  --cds-text-helper: #8d8d8d;
+  --cds-text-placeholder: #6f6f6f;
+  --cds-link-primary: #78a9ff;
+  --cds-interactive: #0f62fe;
+  --cds-interactive-hover: #0353e9;
+  --cds-highlight: #0043ce;
+  --cds-support-success: #24a148;
+  --cds-support-error: #da1e28;
+  --cds-support-warning: #f1c21b;
+  --cds-support-info: #4589ff;
+  --cds-field: #1e1e1e;
+  --cds-field-hover: #2d2d2d;
+}
+
+/* Carbon g10 (Light) theme variables */
+[data-carbon-theme="g10"], .cds--g10 {
+  --cds-background: #f4f4f4;
+  --cds-layer-01: #ffffff;
+  --cds-layer-02: #e8e8e8;
+  --cds-layer-03: #dcdcdc;
+  --cds-layer-accent-01: #e0e0e0;
+  --cds-border-subtle: #e0e0e0;
+  --cds-border-strong: #8d8d8d;
+  --cds-border-tile: #e0e0e0;
+  --cds-text-primary: #161616;
+  --cds-text-secondary: #525252;
+  --cds-text-helper: #6f6f6f;
+  --cds-text-placeholder: #a8a8a8;
+  --cds-link-primary: #0f62fe;
+  --cds-interactive: #0f62fe;
+  --cds-interactive-hover: #0353e9;
+  --cds-highlight: #d0e2ff;
+  --cds-support-success: #198038;
+  --cds-support-error: #da1e28;
+  --cds-support-warning: #b28600;
+  --cds-support-info: #0043ce;
+  --cds-field: #ffffff;
+  --cds-field-hover: #f0f0f0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  width: 100%;
+  background-color: var(--cds-background);
+  color: var(--cds-text-primary);
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5 !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headings line height override */
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.25 !important;
+}
+
+/* Monospace font for specific IDs, figures, hashes */
+.font-mono {
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+
+/* Tabular figures for numbers and stats */
+.tabular-nums, [data-tabular] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Banned styling enforcement: strictly square Carbon geometry */
+* {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Crucial Table Spacing: override Carbon reset's padding: 0 */
+table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  line-height: 1.4 !important;
+}
+
+table th {
+  padding: 10px 14px !important;
+  background-color: var(--cds-layer-02);
+  color: var(--cds-text-secondary);
+  font-family: 'IBM Plex Sans', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  border-bottom: 1px solid var(--cds-border-subtle);
+  vertical-align: middle;
+}
+
+table td {
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--cds-border-subtle);
+  vertical-align: middle;
+}
+
+/* Carbon tabs styling */
+.cds--tabs__nav-item {
+  font-family: 'IBM Plex Sans', sans-serif !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  border-radius: 0 !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--cds-background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--cds-border-strong);
+}
