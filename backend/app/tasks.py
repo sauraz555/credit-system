@@ -35,12 +35,20 @@ def run_data_expiry_job():
             CreditLedger.status.in_([RecordStatusEnum.ACTIVE, RecordStatusEnum.PAID])
         ).update({"status": RecordStatusEnum.EXPIRED})
 
-        # Rule 3: SCI > 7 years (unless resolved, which falls back to 5 yr default handled separately)
+        # Rule 3a: SCI (Unresolved) > 7 years
         sci_cutoff = today - timedelta(days=7 * 365)
         db.query(CreditLedger).filter(
             CreditLedger.record_type == RecordTypeEnum.SCI,
             CreditLedger.valid_from < sci_cutoff,
             CreditLedger.status == RecordStatusEnum.ACTIVE
+        ).update({"status": RecordStatusEnum.EXPIRED})
+
+        # Rule 3b: Resolved SCI reverts to default expiring 5 years from the original default date
+        sci_resolved_cutoff = today - timedelta(days=5 * 365)
+        db.query(CreditLedger).filter(
+            CreditLedger.record_type == RecordTypeEnum.SCI,
+            CreditLedger.status == RecordStatusEnum.RESOLVED,
+            CreditLedger.valid_from < sci_resolved_cutoff
         ).update({"status": RecordStatusEnum.EXPIRED})
 
         # Rule 4: Hardship Flags > 1 year after valid_to (or valid_from if valid_to is None)

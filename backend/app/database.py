@@ -35,7 +35,8 @@ def init_db():
             ("identifier_blind_index", "entities", "VARCHAR"),
             ("entity_id", "users", "VARCHAR"),
             ("totp_secret", "users", "VARCHAR"),
-            ("mfa_enabled", "users", "BOOLEAN DEFAULT 0")
+            ("mfa_enabled", "users", "BOOLEAN DEFAULT 0"),
+            ("details", "audit_log", "JSON")
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {typ}"))

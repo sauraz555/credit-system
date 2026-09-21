@@ -1,11 +1,12 @@
 import math
+from typing import Optional
 from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models import CreditLedger, Enquiry, RecordTypeEnum, RecordStatusEnum, EntityTypeEnum, DirectorLink, Entity
 
-def calculate_individual_features(entity_id: str, db: Session) -> dict:
-    today = date.today()
+def calculate_individual_features(entity_id: str, db: Session, as_of: Optional[date] = None) -> dict:
+    today = as_of or date.today()
     features = {
         "rhi_history_score": 0.0,
         "total_credit_limit": 0.0,
@@ -18,10 +19,17 @@ def calculate_individual_features(entity_id: str, db: Session) -> dict:
     }
 
     # Fetch ledger records
-    records = db.query(CreditLedger).filter(
+    records_q = db.query(CreditLedger).filter(
         CreditLedger.entity_id == entity_id,
-        CreditLedger.status.in_([RecordStatusEnum.ACTIVE, RecordStatusEnum.PAID])
-    ).all()
+        CreditLedger.status.in_([RecordStatusEnum.ACTIVE, RecordStatusEnum.PAID, RecordStatusEnum.RESOLVED])
+    )
+    if as_of:
+        as_of_dt = datetime.combine(as_of, datetime.max.time())
+        records_q = records_q.filter(
+            CreditLedger.valid_from <= as_of,
+            CreditLedger.recorded_at <= as_of_dt
+        )
+    records = records_q.all()
 
     oldest_date = today
     rhi_points = 0
@@ -64,11 +72,13 @@ def calculate_individual_features(entity_id: str, db: Session) -> dict:
 
     # Enquiries
     ninety_days_ago = today - timedelta(days=90)
-    enquiries_count = db.query(Enquiry).filter(
+    enquiries_q = db.query(Enquiry).filter(
         Enquiry.entity_id == entity_id,
         Enquiry.created_at >= ninety_days_ago
-    ).count()
-    features["enquiries_last_90_days"] = enquiries_count
+    )
+    if as_of:
+        enquiries_q = enquiries_q.filter(Enquiry.created_at <= as_of_dt)
+    features["enquiries_last_90_days"] = enquiries_q.count()
 
     return features
 
@@ -107,8 +117,8 @@ def _calculate_director_structural_risk(entity_id: str, db: Session, depth: int 
 
     return risk_score
 
-def calculate_company_features(entity_id: str, db: Session) -> dict:
-    today = date.today()
+def calculate_company_features(entity_id: str, db: Session, as_of: Optional[date] = None) -> dict:
+    today = as_of or date.today()
     features = {
         "paydex_score": 100, # 1-100 index
         "total_exposure": 0.0,
@@ -118,10 +128,17 @@ def calculate_company_features(entity_id: str, db: Session) -> dict:
         "structural_risk_points": 0
     }
 
-    records = db.query(CreditLedger).filter(
+    records_q = db.query(CreditLedger).filter(
         CreditLedger.entity_id == entity_id,
-        CreditLedger.status.in_([RecordStatusEnum.ACTIVE, RecordStatusEnum.PAID])
-    ).all()
+        CreditLedger.status.in_([RecordStatusEnum.ACTIVE, RecordStatusEnum.PAID, RecordStatusEnum.RESOLVED])
+    )
+    if as_of:
+        as_of_dt = datetime.combine(as_of, datetime.max.time())
+        records_q = records_q.filter(
+            CreditLedger.valid_from <= as_of,
+            CreditLedger.recorded_at <= as_of_dt
+        )
+    records = records_q.all()
 
     oldest_date = today
     total_invoice_value = 0.0
@@ -142,7 +159,6 @@ def calculate_company_features(entity_id: str, db: Session) -> dict:
             features["public_record_count"] += 1
 
     # Calculate PAYDEX (1-100)
-    # 0 DBT = 100, >90 DBT = 0. Linear mapping for simplicity in this model
     if total_invoice_value > 0:
         avg_dbt = weighted_dbt_sum / total_invoice_value
         paydex = max(1, 100 - min(100, int(avg_dbt)))
@@ -153,28 +169,37 @@ def calculate_company_features(entity_id: str, db: Session) -> dict:
 
     # Enquiries
     ninety_days_ago = today - timedelta(days=90)
-    enquiries_count = db.query(Enquiry).filter(
+    enquiries_q = db.query(Enquiry).filter(
         Enquiry.entity_id == entity_id,
         Enquiry.created_at >= ninety_days_ago
-    ).count()
-    features["enquiries_last_90_days"] = enquiries_count
+    )
+    if as_of:
+        enquiries_q = enquiries_q.filter(Enquiry.created_at <= as_of_dt)
+    features["enquiries_last_90_days"] = enquiries_q.count()
 
     # Structural risk
     features["structural_risk_points"] = _calculate_director_structural_risk(entity_id, db)
 
     return features
 
-def update_feature_store(entity_id: str, db: Session):
+def update_feature_store(entity_id: str, db: Session, as_of: Optional[date] = None):
     from app.models import FeatureStore
     entity = db.query(Entity).filter(Entity.id == entity_id).first()
     if not entity:
         return None
     
     if entity.type == EntityTypeEnum.INDIVIDUAL:
-        features = calculate_individual_features(entity_id, db)
+        features = calculate_individual_features(entity_id, db, as_of=as_of)
     else:
-        features = calculate_company_features(entity_id, db)
+        features = calculate_company_features(entity_id, db, as_of=as_of)
         
+    if as_of:
+        # For historical point-in-time calculation, return pseudo FeatureStore without modifying current store
+        class HistoricalFeatureStore:
+            def __init__(self, f):
+                self.features = f
+        return HistoricalFeatureStore(features)
+
     fs = db.query(FeatureStore).filter(FeatureStore.entity_id == entity_id).first()
     if not fs:
         fs = FeatureStore(entity_id=entity_id, features=features)

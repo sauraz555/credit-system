@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from typing import List
 
 from app.database import get_db
-from app.models import IngestEvent, CreditLedger, RecordStatusEnum, Entity, User, RoleEnum
+from app.models import IngestEvent, CreditLedger, RecordStatusEnum, RecordTypeEnum, Entity, User, RoleEnum, Provider, AuditLog
 from app.schemas import IngestRecordRequest, BulkIngestResponse
 from app.auth import get_current_user, require_roles
 from app.rate_limiter import rate_limit_ingest
@@ -15,6 +15,20 @@ from app.encryption import compute_blind_index
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 
 def process_record(record_in: IngestRecordRequest, provider_id: str, db: Session) -> None:
+    # 0. Check provider licensing and permitted data types
+    provider = db.query(Provider).filter(Provider.id == provider_id).first()
+    if provider:
+        rec_type_val = record_in.record_type.value if hasattr(record_in.record_type, "value") else str(record_in.record_type)
+        permitted = provider.permitted_data_types or []
+        if rec_type_val not in permitted:
+            raise ValueError(f"Provider '{provider_id}' is not licensed to submit record type '{rec_type_val}'. Permitted: {permitted}")
+        
+        # Privacy Act 1988 Part IIIA: RHI strictly restricted to licensed credit providers (ADI, ACL, ELIGIBLE_LENDER)
+        if rec_type_val == "RHI":
+            eligible_licences = ["ADI", "ACL", "ELIGIBLE_LENDER"]
+            if provider.licence_type.upper() not in eligible_licences:
+                raise ValueError(f"RHI submission rejected: Provider '{provider_id}' licence '{provider.licence_type}' is not an eligible lender (must hold ADI or ACL).")
+
     # Resolve entity_id using direct id, blind index, or identifier
     entity = db.query(Entity).filter(
         (Entity.id == record_in.entity_id) |
@@ -25,9 +39,10 @@ def process_record(record_in: IngestRecordRequest, provider_id: str, db: Session
     target_entity_id = entity.id if entity else record_in.entity_id
 
     # 1. Create append-only event log
+    payload_json = record_in.model_dump(mode="json") if hasattr(record_in, "model_dump") else record_in.dict()
     event = IngestEvent(
         provider_id=provider_id,
-        raw_payload=record_in.dict(),
+        raw_payload=payload_json,
         status="ACCEPTED"
     )
     db.add(event)
@@ -62,14 +77,23 @@ def ingest_record(
         return {"status": "success", "message": "Record ingested successfully"}
     except Exception as e:
         db.rollback()
-        # Log rejection
+        # Log rejection in IngestEvent and AuditLog
+        payload_json = record.model_dump(mode="json") if hasattr(record, "model_dump") else record.dict()
         event = IngestEvent(
             provider_id=provider_id,
-            raw_payload=record.dict(),
+            raw_payload=payload_json,
             status="REJECTED",
             error_log=str(e)
         )
         db.add(event)
+        audit_entry = AuditLog(
+            user_id=current_user.id,
+            action="INGESTION_REJECTION",
+            target_table="ingest_events",
+            target_id=record.entity_id,
+            details={"provider_id": provider_id, "reason": str(e), "record_type": str(record.record_type)}
+        )
+        db.add(audit_entry)
         db.commit()
         raise HTTPException(status_code=400, detail=str(e))
 

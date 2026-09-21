@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Dict, Any, List
 from app.database import get_db
 from app.models import ModelVersion, EntityTypeEnum, AuditLog, User, RoleEnum
@@ -15,6 +15,19 @@ class ModelCreate(BaseModel):
     weights: Dict[str, Any]
     band_thresholds: Dict[str, Any]
     active: bool = False
+
+    @field_validator("weights")
+    @classmethod
+    def validate_weights_total_100(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        if not v:
+            raise ValueError("Weights dictionary cannot be empty")
+        try:
+            total = sum(float(w) for w in v.values())
+        except (ValueError, TypeError):
+            raise ValueError("All weight values must be numeric")
+        if abs(total - 100.0) > 0.001:
+            raise ValueError(f"Model weights must total exactly 100%. Current total: {total}%")
+        return v
 
 @router.post("/models")
 def create_model(

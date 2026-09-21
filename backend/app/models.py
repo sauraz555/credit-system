@@ -55,6 +55,16 @@ class User(Base):
     mfa_enabled = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class Provider(Base):
+    __tablename__ = "providers"
+    
+    id = Column(String, primary_key=True) # e.g. PRV-CBA-001
+    name = Column(String, nullable=False)
+    licence_type = Column(String, nullable=False) # e.g. ADI, ACL, TELECOM, UTILITY, COMMERCIAL
+    permitted_data_types = Column(JSON, default=list) # e.g. ["RHI", "DEFAULT", "ENQUIRY"]
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class Entity(Base):
     __tablename__ = "entities"
     
@@ -171,4 +181,5 @@ class AuditLog(Base):
     target_id = Column(String, nullable=True)
     before_state = Column(JSON, nullable=True)
     after_state = Column(JSON, nullable=True)
+    details = Column(JSON, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)

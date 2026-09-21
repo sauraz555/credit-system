@@ -37,15 +37,20 @@ export default function CreditReportPage() {
   const [isLoadingApi, setIsLoadingApi] = useState<boolean>(false);
 
   // Fetch live bureau report on mount/param change
+  // Fetch live bureau report on mount/param change
   useEffect(() => {
     if (!routeId) return;
     setIsLoadingApi(true);
-    fetch(`http://localhost:8000/api/reports/${encodeURIComponent(routeId)}`)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    fetch(`http://localhost:8000/api/reports/${encodeURIComponent(routeId)}`, { headers })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) setLiveReport(data);
       })
-      .catch(() => {})
+      .catch((err) => console.error("Error fetching credit report", err))
       .finally(() => setIsLoadingApi(false));
   }, [routeId]);
 
@@ -84,67 +89,47 @@ export default function CreditReportPage() {
     : "1984-06-14 (Age 42)";
   const subjectAddress = liveReport?.entity?.basic_info?.address || "42 Miller St, North Sydney NSW 2060";
 
-  // Dynamic values based on As-Of date
+  // Dynamic values derived from bitemporal ledger & score
   const snapshotData = useMemo(() => {
-    switch (asOfDate) {
-      case '2026-06-30':
-        return {
-          score: 698,
-          band: 'Good',
-          bandColor: 'blue',
-          lastUpdated: '2026-06-30 23:59 UTC',
-          defaultStatus: 'ACTIVE_DEFAULT',
-          defaultTagColor: 'red',
-          utilization: 31.4,
-          totalDebt: 15200,
-        };
-      case '2025-12-31':
-        return {
-          score: 642,
-          band: 'Fair',
-          bandColor: 'cyan',
-          lastUpdated: '2025-12-31 23:59 UTC',
-          defaultStatus: 'PENDING_NOTICE',
-          defaultTagColor: 'yellow',
-          utilization: 42.1,
-          totalDebt: 20400,
-        };
-      case '2024-03-01':
-        return {
-          score: 590,
-          band: 'Subprime',
-          bandColor: 'magenta',
-          lastUpdated: '2024-03-01 12:00 UTC',
-          defaultStatus: 'FRESH_DEFAULT',
-          defaultTagColor: 'red',
-          utilization: 48.6,
-          totalDebt: 23800,
-        };
-      case 'CURRENT':
-      default:
-        const liveScore = liveReport?.score?.value ?? 712;
-        const liveBand = liveReport?.score?.band ?? 'Good (Prime Tier 2)';
-        const bandColor = liveScore >= 800 ? 'green' : liveScore >= 700 ? 'blue' : liveScore >= 600 ? 'cyan' : 'red';
-        return {
-          score: liveScore,
-          band: liveBand,
-          bandColor: bandColor,
-          lastUpdated: liveReport?.score?.calculated_at ? `${liveReport.score.calculated_at.slice(0, 16).replace('T', ' ')} UTC` : '2026-09-21 08:30 UTC',
-          defaultStatus: disputeSubmitted ? 'DISPUTED (Sec 20V)' : (liveReport?.ledger?.some((l: any) => l.record_type === 'DEFAULT' && l.status === 'DISPUTED') ? 'DISPUTED (Flagged)' : 'ACTIVE / VERIFIED'),
-          defaultTagColor: disputeSubmitted ? 'purple' : 'red',
-          utilization: 25.4,
-          totalDebt: 12340,
-        };
-    }
-  }, [asOfDate, disputeSubmitted]);
+    const liveScore = liveReport?.score?.value ?? 712;
+    const liveBand = liveReport?.score?.band ?? 'Good (Prime Tier 2)';
+    const bandColor = liveScore >= 800 ? 'green' : liveScore >= 700 ? 'blue' : liveScore >= 600 ? 'cyan' : 'red';
+    const hasDispute = disputeSubmitted || liveReport?.ledger?.some((l: any) => l.record_type === 'DEFAULT' && l.status === 'DISPUTED');
+    const hasDefault = liveReport?.ledger?.some((l: any) => l.record_type === 'DEFAULT' && l.status === 'ACTIVE');
 
-  // Handle Time Travel switch
-  const handleTimeTravel = (dateKey: string) => {
+    return {
+      score: liveScore,
+      band: liveBand,
+      bandColor: bandColor,
+      lastUpdated: liveReport?.score?.calculated_at 
+        ? `${liveReport.score.calculated_at.slice(0, 16).replace('T', ' ')} UTC` 
+        : (asOfDate === 'CURRENT' ? '2026-09-22 08:30 UTC' : `${asOfDate} 23:59 UTC`),
+      defaultStatus: hasDispute ? 'DISPUTED (Sec 20V)' : (hasDefault ? 'ACTIVE_DEFAULT' : 'CLEARED / PAID'),
+      defaultTagColor: hasDispute ? 'purple' : (hasDefault ? 'red' : 'green'),
+      utilization: 25.4,
+      totalDebt: 12340,
+    };
+  }, [liveReport, asOfDate, disputeSubmitted]);
+
+  // Handle Time Travel switch: fetch bitemporal point-in-time reconstruction from API
+  const handleTimeTravel = async (dateKey: string) => {
     setIsLoadingTimeTravel(true);
     setAsOfDate(dateKey);
-    setTimeout(() => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const url = `http://localhost:8000/api/reports/${encodeURIComponent(routeId)}${dateKey !== 'CURRENT' ? `?as_of=${dateKey}` : ''}`;
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setLiveReport(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch historical report", err);
+    } finally {
       setIsLoadingTimeTravel(false);
-    }, 280);
+    }
   };
 
   // Calculate live simulated score
@@ -1067,38 +1052,41 @@ export default function CreditReportPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                    <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                      <td className="p-3 font-mono text-white">2026-03-15</td>
-                      <td className="p-3 font-medium text-white">Macquarie Bank Limited</td>
-                      <td className="p-3 text-[var(--cds-text-secondary)]">Residential Mortgage Application</td>
-                      <td className="p-3"><Tag type="purple" size="sm" className="m-0 font-mono">HARD INQUIRY</Tag></td>
-                      <td className="p-3 text-right font-mono text-gray-300 font-bold">$720,000</td>
-                      <td className="p-3 font-mono text-yellow-400 font-bold">-4 pts</td>
-                    </tr>
-                    <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                      <td className="p-3 font-mono text-white">2025-10-10</td>
-                      <td className="p-3 font-medium text-white">Commonwealth Bank of Australia</td>
-                      <td className="p-3 text-[var(--cds-text-secondary)]">Credit Card Facility Increase</td>
-                      <td className="p-3"><Tag type="purple" size="sm" className="m-0 font-mono">HARD INQUIRY</Tag></td>
-                      <td className="p-3 text-right font-mono text-gray-300 font-bold">$10,000</td>
-                      <td className="p-3 font-mono text-yellow-400 font-bold">-4 pts</td>
-                    </tr>
-                    <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                      <td className="p-3 font-mono text-white">2025-06-04</td>
-                      <td className="p-3 font-medium text-white">Latitude Financial Services</td>
-                      <td className="p-3 text-[var(--cds-text-secondary)]">Consumer Electronics Purchase Finance</td>
-                      <td className="p-3"><Tag type="purple" size="sm" className="m-0 font-mono">HARD INQUIRY</Tag></td>
-                      <td className="p-3 text-right font-mono text-gray-300 font-bold">$2,800</td>
-                      <td className="p-3 text-[var(--cds-text-helper)]">Neutral (Aged)</td>
-                    </tr>
-                    <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                      <td className="p-3 font-mono text-white">2026-09-20</td>
-                      <td className="p-3 font-medium text-white">Self-Check / Subject Access Portal</td>
-                      <td className="p-3 text-[var(--cds-text-secondary)]">Consumer Comprehensive Credit Inspection</td>
-                      <td className="p-3"><Tag type="gray" size="sm" className="m-0 font-mono">SOFT INQUIRY</Tag></td>
-                      <td className="p-3 text-right font-mono text-gray-400">N/A</td>
-                      <td className="p-3 font-mono text-emerald-400 font-bold">0 pts (No Impact)</td>
-                    </tr>
+                    {liveReport?.enquiries && liveReport.enquiries.length > 0 ? (
+                      liveReport.enquiries.map((enq: any) => (
+                        <tr key={enq.id} className="hover:bg-[var(--cds-layer-02)] transition-colors">
+                          <td className="p-3 font-mono text-white">
+                            {enq.created_at ? enq.created_at.slice(0, 10) : '2026-09-22'}
+                          </td>
+                          <td className="p-3 font-medium text-white">
+                            {enq.user_id || 'Subscriber / Credit Provider'}
+                          </td>
+                          <td className="p-3 text-[var(--cds-text-secondary)]">
+                            {enq.reason || 'Comprehensive Credit Assessment'}
+                          </td>
+                          <td className="p-3">
+                            <Tag type="purple" size="sm" className="m-0 font-mono">
+                              CREDIT INQUIRY
+                            </Tag>
+                          </td>
+                          <td className="p-3 text-right font-mono text-gray-300 font-bold">
+                            {enq.id.slice(0, 12)}
+                          </td>
+                          <td className="p-3 font-mono text-emerald-400 font-bold">
+                            Logged (Part IIIA)
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
+                        <td className="p-3 font-mono text-white">2026-09-22</td>
+                        <td className="p-3 font-medium text-white">Subject Self-Check</td>
+                        <td className="p-3 text-[var(--cds-text-secondary)]">Consumer Access Assessment</td>
+                        <td className="p-3"><Tag type="gray" size="sm" className="m-0 font-mono">SOFT INQUIRY</Tag></td>
+                        <td className="p-3 text-right font-mono text-gray-400">N/A</td>
+                        <td className="p-3 font-mono text-emerald-400 font-bold">0 pts</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

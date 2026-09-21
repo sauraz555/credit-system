@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, time, date
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
@@ -165,10 +166,11 @@ def evaluate_score(
 def get_report(
     entity_id: str,
     request: Request,
+    as_of: Optional[str] = Query(None, description="Point-in-time date YYYY-MM-DD"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Fetch full credit report, returning score, ledger, and director links."""
+    """Fetch full credit report, returning score, ledger, enquiries, and director links."""
     rate_limit_reports(request, current_user.id)
     
     entity = find_entity(entity_id, db)
@@ -183,28 +185,91 @@ def get_report(
                 detail="Forbidden: Subjects may only inspect their own personal credit file."
             )
         
-    # Log enquiry attributed to caller
-    try:
-        enquiry = Enquiry(
-            entity_id=entity.id,
-            user_id=current_user.id,
-            reason="Comprehensive Bureau Credit Assessment (Part IIIA)"
+    # Parse as_of parameter for point-in-time bitemporal queries
+    as_of_date = None
+    as_of_dt = None
+    if as_of:
+        try:
+            as_of_date = datetime.strptime(as_of.strip(), "%Y-%m-%d").date()
+            as_of_dt = datetime.combine(as_of_date, time.max)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid as_of date format. Use YYYY-MM-DD")
+
+    # Log enquiry attributed to caller (only for live non-as-of queries)
+    if not as_of:
+        try:
+            enquiry = Enquiry(
+                entity_id=entity.id,
+                user_id=current_user.id,
+                reason="Comprehensive Bureau Credit Assessment (Part IIIA)"
+            )
+            db.add(enquiry)
+            db.commit()
+        except Exception:
+            db.rollback()
+        
+    # Fetch ledger records according to bitemporal rules (valid_from <= as_of AND recorded_at <= as_of)
+    ledger_query = db.query(CreditLedger).filter(CreditLedger.entity_id == entity.id)
+    if as_of_date:
+        ledger_query = ledger_query.filter(
+            CreditLedger.valid_from <= as_of_date,
+            CreditLedger.recorded_at <= as_of_dt
         )
-        db.add(enquiry)
-        db.commit()
-    except Exception:
-        db.rollback()
-        
-    # Fetch active score
-    score = db.query(Score).filter(Score.entity_id == entity.id).order_by(Score.calculated_at.desc()).first()
-    
-    # If no score exists, calculate it real-time
-    if not score:
-        fs = update_feature_store(entity.id, db)
-        score = calculate_and_save_score(entity.id, entity.type, fs.features, db)
-        
-    # Fetch ledger records
-    ledger = db.query(CreditLedger).filter(CreditLedger.entity_id == entity.id).order_by(CreditLedger.valid_from.desc()).all()
+    ledger = ledger_query.order_by(CreditLedger.valid_from.desc()).all()
+
+    # Fetch enquiries
+    enquiries_query = db.query(Enquiry).filter(Enquiry.entity_id == entity.id)
+    if as_of_dt:
+        enquiries_query = enquiries_query.filter(Enquiry.created_at <= as_of_dt)
+    enquiries = enquiries_query.order_by(Enquiry.created_at.desc()).all()
+
+    # Reconstruct or fetch score
+    if as_of_dt:
+        historical_score = db.query(Score).filter(
+            Score.entity_id == entity.id,
+            Score.calculated_at <= as_of_dt
+        ).order_by(Score.calculated_at.desc()).first()
+
+        if historical_score:
+            score_data = {
+                "value": historical_score.score_value,
+                "band": historical_score.band,
+                "top_factors": historical_score.top_factors,
+                "sub_scores": historical_score.sub_scores,
+                "calculated_at": str(historical_score.calculated_at)
+            }
+        else:
+            # Reconstruct score using bitemporal point-in-time features
+            fs = update_feature_store(entity.id, db, as_of=as_of_date)
+            from app.services.scoring import evaluate_individual_score, evaluate_company_score, ModelVersion
+            model = db.query(ModelVersion).filter(ModelVersion.type == entity.type, ModelVersion.active == True).first()
+            if not model:
+                model = db.query(ModelVersion).first()
+            
+            if entity.type == EntityTypeEnum.INDIVIDUAL:
+                eval_res = evaluate_individual_score(entity.id, fs.features, model)
+            else:
+                eval_res = evaluate_company_score(entity.id, fs.features, model)
+                
+            score_data = {
+                "value": eval_res["score"],
+                "band": eval_res["band"],
+                "top_factors": eval_res["top_factors"],
+                "sub_scores": eval_res["sub_scores"],
+                "calculated_at": str(as_of_dt)
+            }
+    else:
+        score = db.query(Score).filter(Score.entity_id == entity.id).order_by(Score.calculated_at.desc()).first()
+        if not score:
+            fs = update_feature_store(entity.id, db)
+            score = calculate_and_save_score(entity.id, entity.type, fs.features, db)
+        score_data = {
+            "value": score.score_value,
+            "band": score.band,
+            "top_factors": score.top_factors,
+            "sub_scores": score.sub_scores,
+            "calculated_at": str(score.calculated_at)
+        }
     
     # Fetch director relationships
     directors_data = []
@@ -257,15 +322,19 @@ def get_report(
             "basic_info": entity.basic_info if isinstance(entity.basic_info, dict) else (json.loads(decrypt_field(entity.basic_info)) if entity.basic_info else {}),
             "created_at": str(entity.created_at)
         },
-        "score": {
-            "value": score.score_value,
-            "band": score.band,
-            "top_factors": score.top_factors,
-            "sub_scores": score.sub_scores,
-            "calculated_at": str(score.calculated_at)
-        },
+        "score": score_data,
         "directors": directors_data,
         "directorships": directorships_data,
+        "enquiries": [
+            {
+                "id": enq.id,
+                "entity_id": enq.entity_id,
+                "user_id": enq.user_id,
+                "reason": enq.reason,
+                "created_at": str(enq.created_at)
+            }
+            for enq in enquiries
+        ],
         "ledger": [
             {
                 "id": rec.id,
