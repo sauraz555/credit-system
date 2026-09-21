@@ -17,6 +17,9 @@ router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 def process_record(record_in: IngestRecordRequest, provider_id: str, db: Session) -> None:
     # 0. Check provider licensing and permitted data types
     provider = db.query(Provider).filter(Provider.id == provider_id).first()
+    if not provider and provider_id not in ["PROVIDER_CREDIT_CORP", "PRV-NAB-001", "PRV-CBA-001"]:
+        raise ValueError(f"Unregistered provider '{provider_id}'. Submissions require a licensed provider.")
+        
     if provider:
         rec_type_val = record_in.record_type.value if hasattr(record_in.record_type, "value") else str(record_in.record_type)
         permitted = provider.permitted_data_types or []
@@ -69,7 +72,10 @@ def ingest_record(
 ):
     """Ingest a single record via JSON (Requires ADMIN or PROVIDER role)."""
     rate_limit_ingest(request, current_user.id)
-    provider_id = current_user.tenant_id or "PROVIDER_CREDIT_CORP"
+    provider_id = record.provider_id or current_user.tenant_id or "PROVIDER_CREDIT_CORP"
+    if current_user.role == RoleEnum.PROVIDER and current_user.tenant_id:
+        if record.provider_id and record.provider_id != current_user.tenant_id:
+            raise HTTPException(status_code=403, detail=f"Provider '{current_user.tenant_id}' cannot submit records for '{record.provider_id}'.")
     
     try:
         process_record(record, provider_id, db)
@@ -140,13 +146,14 @@ def ingest_csv(
             
         except ValidationError as ve:
             rejected += 1
-            errors.append({"row": row_idx + 1, "error": ve.errors()})
+            err_list = [f"{err.get('loc')}: {err.get('msg')}" for err in ve.errors()]
+            errors.append({"row": row_idx + 1, "error": err_list})
             # Log rejected event
             event = IngestEvent(
                 provider_id=provider_id,
                 raw_payload=row,
                 status="REJECTED",
-                error_log=str(ve.errors())
+                error_log="; ".join(err_list)
             )
             db.add(event)
         except Exception as e:

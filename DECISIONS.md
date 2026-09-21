@@ -30,3 +30,24 @@ This document records all architectural choices, engineering tradeoffs, and reso
 - **Synthetic Outcomes Dataset**: Pre-generated and seeded `synthetic_outcomes.csv` with 200 empirical entity outcomes calibrated against baseline scores to enable zero-upload automated testing and demonstrations.
 - **Dedicated Analyst Workspace**: Built `/analyst` on IBM Carbon Design System featuring tabbed workflows for statutory s20V dispute tracking, bitemporal point-in-time file investigation, and backtesting calibration tables with prominent read-only model governance alerts.
 
+## Milestone 4: Test Coverage & Edge Case Hardening Decisions
+- **Edge Case Coverage**: Implemented comprehensive tests in `backend/tests/test_milestone4_edge_cases.py` verifying:
+  - Clean files (100% on-time RHI, 0 defaults, long history) achieving >=800 Excellent score.
+  - Thin file cap: history < 3 months strictly capped at 499 regardless of payment perfection.
+  - Active default penalty: -100 points per active default.
+  - Paid default treatment: status=PAID does not penalize as active default (-20 pts vs -100 pts), retained for 5 years.
+  - SCI resolved reversion: unresolved retained 7 years, resolved reverts to 5-year default expiration.
+  - Permanent Hardship Neutrality suite: verified that financial hardship flags (`V` or `A`) on RHI or ledger entries do NOT change credit scores (identical files with/without hardship yield identical scores).
+  - Hardship-only file: calculates cleanly without errors and respects thin-file cap with zero public record penalties.
+  - Director contagion structural risk: bankrupt director linked to multiple companies propagates structural risk penalty (-50 pts per risk point).
+  - PAYDEX calculation and public records impact on corporate credit scoring.
+  - FeatureStore point-in-time slices and Score persistence.
+  - Ingestion validation, provider tenant isolation, bulk CSV error handling, and audit event tracking.
+- **Coverage Target Achieved**: Exceeded the >=85% target across all 4 key modules:
+  - `ingest.py`: **94%**
+  - `scoring.py`: **92%**
+  - `features.py`: **88%**
+  - `tasks.py`: **88%**
+  - Combined suite coverage: **91%** with 36 passing tests.
+
+

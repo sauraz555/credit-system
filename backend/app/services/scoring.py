@@ -22,7 +22,12 @@ def evaluate_individual_score(entity_id: str, features: dict, model: ModelVersio
     base_score = 400 + payment_points + history_points + enquiry_points
     
     # Penalties
-    def_penalty = features.get("default_count", 0) * 100
+    if "active_default_count" in features or "paid_default_count" in features:
+        active_defs = features.get("active_default_count", 0)
+        paid_defs = features.get("paid_default_count", 0)
+        def_penalty = (active_defs * 100) + (paid_defs * 20)
+    else:
+        def_penalty = features.get("default_count", 0) * 100
     sci_penalty = features.get("sci_count", 0) * 150
     bank_penalty = features.get("bankruptcy_count", 0) * 300
     

@@ -10,6 +10,7 @@ class IngestRecordRequest(BaseModel):
     data: Dict[str, Any]
     valid_from: date
     valid_to: Optional[date] = None
+    provider_id: Optional[str] = None
 
     @validator('data')
     def validate_data(cls, v, values):

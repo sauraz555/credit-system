@@ -50,13 +50,24 @@ def calculate_individual_features(entity_id: str, db: Session, as_of: Optional[d
                     rhi_points += weight
                 elif char in '123456':
                     rhi_points += (weight * (1.0 - int(char)/10.0)) # partial points
+                elif char in ['V', 'A']:
+                    # Hardship arrangements: under CCR, treated neutral (does not reduce score like late payments)
+                    rhi_points += weight
                 elif char == 'X':
                     pass # 0 points
 
         elif rec.record_type == RecordTypeEnum.DEFAULT:
+            if rec.status == RecordStatusEnum.ACTIVE:
+                features["active_default_count"] = features.get("active_default_count", 0) + 1
+            elif rec.status == RecordStatusEnum.PAID:
+                features["paid_default_count"] = features.get("paid_default_count", 0) + 1
             features["default_count"] += 1
             if rec.amount:
                 features["default_amount"] += float(rec.amount)
+
+        elif rec.record_type == RecordTypeEnum.HARDSHIP:
+            # Statutory Hardship Neutrality (Privacy Act Part IIIA): flagged but does not penalize score
+            features["hardship_flag"] = True
 
         elif rec.record_type == RecordTypeEnum.SCI:
             features["sci_count"] += 1
