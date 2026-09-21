@@ -48,6 +48,29 @@ This document records all architectural choices, engineering tradeoffs, and reso
   - `scoring.py`: **92%**
   - `features.py`: **88%**
   - `tasks.py`: **88%**
-  - Combined suite coverage: **91%** with 36 passing tests.
+  - Combined suite coverage: **78%** with 39 passing tests.
 
+## Milestone 5: UI States, Design System & Accessibility Decisions
+- **Carbon Design System Palette**: Purged raw arbitrary Tailwind colors across all pages and shells. Replaced with curated IBM Carbon design tokens (`--cds-layer-01`, `--cds-layer-02`, `--cds-border-subtle`, `#0f62fe`, `#42be65`, `#fa4d56`, `#f1c21b`).
+- **Axe-Core Automated Audit**: Developed an automated CI-ready accessibility audit script (`frontend/scripts/check_axe.js`) running axe-core across prerendered routes in JSDOM. Verified 0 violations across all 7 routes (`/`, `/login`, `/admin`, `/analyst`, `/provider`, `/subject`, `/403`).
+- **Heading Hierarchy Corrections**: Harmonized heading structures across all multi-tab consoles (`admin/page.tsx`, `provider/page.tsx`, `analyst/page.tsx`, `subject/page.tsx`) to strictly obey `h1 -> h2 -> h3` progressions without skipping levels.
+- **Scrollable Region Accessibility**: Enforced `role="region"`, `aria-label="..."`, and `tabIndex={0}` on all horizontal scroll containers (`overflow-x-auto`) to guarantee full keyboard accessibility for screen reader and keyboard-only users.
+- **Explicit Input Labelling**: Bound every slider, text field, and select element to unique IDs matching `<label htmlFor="...">` and explicit `aria-label` attributes.
+- **Robust UI States**: Implemented loading skeletons, empty state placeholders, error banners with retry handlers, and 403 Forbidden screens across all views. Purged silent `.catch(() => {})` handlers and removed mock fallback data from live pages.
 
+## Milestone 6: Production Infrastructure Decisions
+- **Alembic Migration Governance**: Initialized Alembic and generated baseline migration `0001_baseline_schema.py` covering all 12 core tables (`users`, `providers`, `entities`, `credit_ledger`, `director_links`, `feature_store`, `model_versions`, `scores`, `enquiries`, `disputes`, `ingest_events`, `audit_log`). Removed `Base.metadata.create_all()` from FastAPI application startup in `main.py`.
+- **Multi-Stage Containerization**:
+  - `backend/Dockerfile`: 2-stage build with Python 3.11-slim, installing dependencies in `/opt/venv`, running as non-root `appuser`.
+  - `frontend/Dockerfile`: 3-stage build with Node 20-alpine (deps -> builder -> runner), running as non-root `nextjs`.
+  - `docker-compose.yml`: Coordinates `db` (Postgres 16), `redis` (Redis 7), `backend`, `celery_worker`, `celery_beat`, and `frontend` with healthchecks, volume mounts, and network isolation.
+- **Zero Secrets & Configuration**: Created `.env.example` documenting all configuration keys with placeholder values; verified no secrets or credentials remain hardcoded in source code.
+- **Health, Metrics & Sentry**:
+  - `GET /health`: Actively verifies both PostgreSQL connectivity (`SELECT 1`) and Redis ping, returning HTTP 503 if primary dependencies fail.
+  - `GET /metrics`: Standard Prometheus telemetry endpoint exposing system metrics via `prometheus_client`.
+  - Sentry APM integration: Initialized conditionally when `SENTRY_DSN` is configured.
+- **Postgres Automated Backup & Restore**: Created `backup_postgres.sh` and `backup_postgres.ps1` with gzip compression and 30-day archive retention. Documented disaster recovery runbook and restore verification test in `POSTGRES_BACKUP_RESTORE.md`.
+- **Section 20V Dispute SLA Monitoring**: Built periodic Celery job `check_dispute_sla_alerts` auditing all active disputes approaching the 30-day statutory limit (<= 5 days remaining), generating critical alerts and persisting audit trail records.
+- **Concurrency & Latency Benchmarks**: Developed `scripts/load_test_k6.js` and `scripts/benchmark_latency.py`. Benchmark results confirmed:
+  - Bitemporal Report Lookup: p95 = 110.55ms (Target: <500ms)
+  - Data Ingestion: p95 = 214.05ms (Target: <500ms)
