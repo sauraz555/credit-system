@@ -71,6 +71,7 @@ backend/credit_system.db
 credit_system.db
 .env
 .env.*
+!.env.example
 .env.local
 backups/
 
