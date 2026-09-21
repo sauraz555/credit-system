@@ -38,6 +38,8 @@ function CommercialSubjectContent() {
   const [selectedEntityId, setSelectedEntityId] = useState(queryId);
   const [liveReport, setLiveReport] = useState<any>(null);
   const [isLoadingApi, setIsLoadingApi] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [isForbidden, setIsForbidden] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [companyList, setCompanyList] = useState<any[]>([]);
 
@@ -50,55 +52,55 @@ function CommercialSubjectContent() {
           setCompanyList(data.entities);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error("Failed to load company entities list", err);
+      });
   }, []);
 
   // Fetch live company report
   useEffect(() => {
     if (!selectedEntityId) return;
     setIsLoadingApi(true);
+    setReportError(null);
+    setIsForbidden(false);
     fetch(`http://localhost:8000/api/reports/${encodeURIComponent(selectedEntityId)}`)
-      .then(res => res.ok ? res.json() : null)
+      .then(async (res) => {
+        if (res.status === 403) {
+          setIsForbidden(true);
+          throw new Error('403 Forbidden: Insufficient permissions to access commercial entity report.');
+        }
+        if (!res.ok) {
+          throw new Error(`Failed to load commercial credit file (HTTP ${res.status})`);
+        }
+        return res.json();
+      })
       .then(data => {
         if (data) setLiveReport(data);
       })
-      .catch(() => {})
+      .catch((err) => {
+        setReportError(err.message || 'Error fetching commercial credit report');
+      })
       .finally(() => setIsLoadingApi(false));
   }, [selectedEntityId]);
 
   // Derived Company Profile
   const company = useMemo(() => {
-    if (liveReport && liveReport.entity) {
-      const b = liveReport.entity.basic_info || {};
-      const scoreVal = liveReport.score?.value ?? 78;
-      return {
-        acn: b.acn || liveReport.entity.identifier || '109-283-912',
-        abn: b.abn || '48 109 283 912',
-        name: b.company_name || 'Apex Industrial Holdings Pty Ltd',
-        industry: b.industry || 'Heavy Machinery & Industrial Equipment Wholesaling (ANZSIC 3411)',
-        incorporationDate: b.registration_date ? `${b.registration_date} (Registered)` : '2004-05-18 (22 Years Active)',
-        registeredOffice: b.address || 'Level 14, 201 Kent St, Sydney NSW 2000',
-        status: 'ACTIVE / TRADING',
-        paydexScore: scoreVal > 100 ? Math.round((scoreVal / 1000) * 100) : scoreVal,
-        paydexDescription: scoreVal >= 75 ? 'Prompt / Within Terms (Avg DBT: +4 Days)' : 'Elevated DBT (> 15 Days Beyond Terms)',
-        riskTier: scoreVal >= 75 ? 'Low-to-Medium Risk (Tier 2)' : 'Elevated Risk (Tier 4)',
-        failureProbability: scoreVal >= 75 ? '0.84% (12-Month Insolvency Risk)' : '4.21% (12-Month Insolvency Risk)'
-      };
-    }
+    const b = liveReport?.entity?.basic_info || {};
+    const scoreVal = liveReport?.score?.value ?? 78;
     return {
-      acn: '109-283-912',
-      abn: '48 109 283 912',
-      name: 'Apex Industrial Holdings Pty Ltd',
-      industry: 'Heavy Machinery & Industrial Equipment Wholesaling (ANZSIC 3411)',
-      incorporationDate: '2004-05-18 (22 Years Active)',
-      registeredOffice: 'Level 14, 201 Kent St, Sydney NSW 2000',
+      acn: b.acn || liveReport?.entity?.identifier || selectedEntityId || 'ACN-109-283-912',
+      abn: b.abn || '48 109 283 912',
+      name: b.company_name || 'Apex Industrial Holdings Pty Ltd',
+      industry: b.industry || 'Industrial Fabrication & Mining Engineering',
+      incorporationDate: b.registration_date ? `${b.registration_date} (Registered)` : '2004-05-18 (Active)',
+      registeredOffice: b.address || 'Level 14, 250 St Georges Terrace, Perth WA 6000',
       status: 'ACTIVE / TRADING',
-      paydexScore: 78,
-      paydexDescription: 'Prompt / Within Terms (Avg DBT: +4 Days)',
-      riskTier: 'Low-to-Medium Risk (Tier 2)',
-      failureProbability: '0.84% (12-Month Insolvency Risk)'
+      paydexScore: scoreVal > 100 ? Math.round((scoreVal / 1000) * 100) : scoreVal,
+      paydexDescription: scoreVal >= 75 ? 'Prompt / Within Terms (Avg DBT: +4 Days)' : 'Elevated DBT (> 15 Days Beyond Terms)',
+      riskTier: scoreVal >= 75 ? 'Low-to-Medium Risk (Tier 2)' : 'Elevated Risk (Tier 4)',
+      failureProbability: scoreVal >= 75 ? '0.84% (12-Month Insolvency Risk)' : '4.21% (12-Month Insolvency Risk)'
     };
-  }, [liveReport]);
+  }, [liveReport, selectedEntityId]);
 
   // Trade Credit Experiences dataset
   const tradeExperiences = [
@@ -235,13 +237,15 @@ function CommercialSubjectContent() {
         <div className="flex items-center gap-3">
           {/* Quick company switcher */}
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-[var(--cds-text-secondary)]">Switch Registered Entity:</span>
+            <label htmlFor="switch-registered-entity" className="text-[var(--cds-text-secondary)]">Switch Registered Entity:</label>
             <select
+              id="switch-registered-entity"
+              aria-label="Switch Registered Entity"
               value={selectedEntityId}
               onChange={(e) => setSelectedEntityId(e.target.value)}
               className="bg-[var(--cds-field)] text-white text-xs px-2.5 py-1.5 border border-[var(--cds-border-subtle)] focus:outline-none focus:border-[#0f62fe]"
             >
-              <option value="ACN-109-283-912">Apex Industrial Holdings (Default)</option>
+              <option value="ACN-109-283-912">Apex Industrial Holdings (ACN-109-283-912)</option>
               {companyList.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.basic_info?.company_name || c.identifier} ({c.identifier})
@@ -261,60 +265,96 @@ function CommercialSubjectContent() {
         </div>
       </div>
 
-      {/* Primary Commercial Entity Header */}
-      <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-1.5">
-              <h1 className="text-2xl md:text-3xl font-light text-white tracking-tight">
-                {company.name}
-              </h1>
-              <Tag type="teal" size="sm" className="font-mono m-0">PROPRIETARY LIMITED</Tag>
-              <Tag type="green" size="sm" className="font-mono m-0">{company.status}</Tag>
-              {isLoadingApi && <InlineLoading status="active" description="Syncing ledger..." />}
-            </div>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-[var(--cds-text-secondary)]">
-              <div><span className="text-[var(--cds-text-helper)]">ACN:</span> <span className="font-mono text-white">{company.acn}</span></div>
-              <div><span className="text-[var(--cds-text-helper)]">ABN:</span> <span className="font-mono text-white">{company.abn}</span></div>
-              <div><span className="text-[var(--cds-text-helper)]">INDUSTRY:</span> <span className="text-white">{company.industry}</span></div>
-              <div><span className="text-[var(--cds-text-helper)]">REGISTERED:</span> <span className="text-white">{company.registeredOffice}</span></div>
-            </div>
-          </div>
+      {/* 403 Forbidden State */}
+      {isForbidden && (
+        <div className="p-4 bg-[var(--cds-layer-02)] border-l-4 border-[#da1e28] text-xs mb-6">
+          <div className="font-bold text-[#fa4d56] uppercase">403 Forbidden: Commercial File Access Restricted</div>
+          <div className="text-[var(--cds-text-secondary)] mt-1">Your role does not have authorization to inspect commercial corporate credit files.</div>
+        </div>
+      )}
 
-          <div className="flex items-center gap-4 text-xs bg-[var(--cds-layer-02)] px-4 py-3 border border-[var(--cds-border-subtle)]">
+      {/* Error State */}
+      {reportError && !isForbidden && (
+        <div className="mb-6">
+          <InlineNotification
+            kind="error"
+            title="Unable to Retrieve Corporate File"
+            subtitle={reportError}
+            lowContrast
+          />
+        </div>
+      )}
+
+      {/* Loading Skeleton */}
+      {isLoadingApi && !company && (
+        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-8 mb-6 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
+          <InlineLoading description="Loading verified commercial credit file..." />
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoadingApi && !company && !isForbidden && !reportError && (
+        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-8 mb-6 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
+          No commercial entity record found for ID: {selectedEntityId}. Select another registered entity above.
+        </div>
+      )}
+
+      {/* Primary Commercial Entity Header */}
+      {company && (
+        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <div className="text-[var(--cds-text-helper)] uppercase text-[10px] tracking-wider">PAYDEX Commercial Score</div>
-              <div className="font-mono text-2xl font-bold text-white flex items-center gap-2">
-                {company.paydexScore} <span className="text-xs text-[var(--cds-text-helper)] font-normal">/ 100</span>
+              <div className="flex items-center gap-3 mb-1.5">
+                <h1 className="text-2xl md:text-3xl font-light text-white tracking-tight">
+                  {company.name}
+                </h1>
+                <Tag type="teal" size="sm" className="font-mono m-0">PROPRIETARY LIMITED</Tag>
+                <Tag type="green" size="sm" className="font-mono m-0">{company.status}</Tag>
+                {isLoadingApi && <InlineLoading status="active" description="Syncing ledger..." />}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-[var(--cds-text-secondary)]">
+                <div><span className="text-[var(--cds-text-helper)]">ACN:</span> <span className="font-mono text-white">{company.acn}</span></div>
+                <div><span className="text-[var(--cds-text-helper)]">ABN:</span> <span className="font-mono text-white">{company.abn}</span></div>
+                <div><span className="text-[var(--cds-text-helper)]">INDUSTRY:</span> <span className="text-white">{company.industry}</span></div>
+                <div><span className="text-[var(--cds-text-helper)]">REGISTERED:</span> <span className="text-white">{company.registeredOffice}</span></div>
               </div>
             </div>
-            <div className="border-l border-[var(--cds-border-subtle)] pl-4">
-              <div className="text-[var(--cds-text-helper)] uppercase text-[10px] tracking-wider">Payment Behavior</div>
-              <div className="font-semibold text-emerald-400">PROMPT (DBT +4)</div>
+
+            <div className="flex items-center gap-4 text-xs bg-[var(--cds-layer-02)] px-4 py-3 border border-[var(--cds-border-subtle)]">
+              <div>
+                <div className="text-[var(--cds-text-helper)] uppercase text-[10px] tracking-wider">PAYDEX Commercial Score</div>
+                <div className="font-mono text-2xl font-bold text-white flex items-center gap-2">
+                  {company.paydexScore} <span className="text-xs text-[var(--cds-text-helper)] font-normal">/ 100</span>
+                </div>
+              </div>
+              <div className="border-l border-[var(--cds-border-subtle)] pl-4">
+                <div className="text-[var(--cds-text-helper)] uppercase text-[10px] tracking-wider">Payment Behavior</div>
+                <div className="font-semibold text-[#42be65]">PROMPT (DBT +4)</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Commercial Risk Strip */}
+          <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+            <div>
+              <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">12-Month Insolvency Risk</span>
+              <span className="text-white font-bold">{company.failureProbability}</span>
+            </div>
+            <div>
+              <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Bureau Risk Assessment</span>
+              <span className="text-[#4589ff] font-bold">{company.riskTier}</span>
+            </div>
+            <div>
+              <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">ASIC Registration</span>
+              <span className="text-white">{company.incorporationDate}</span>
+            </div>
+            <div>
+              <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Director Contagion Risk</span>
+              <span className="text-[#42be65] font-bold">LOW (0 Adverse Links)</span>
             </div>
           </div>
         </div>
-
-        {/* Commercial Risk Strip */}
-        <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
-          <div>
-            <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">12-Month Insolvency Risk</span>
-            <span className="text-white font-bold">{company.failureProbability}</span>
-          </div>
-          <div>
-            <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Bureau Risk Assessment</span>
-            <span className="text-blue-400 font-bold">{company.riskTier}</span>
-          </div>
-          <div>
-            <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">ASIC Registration</span>
-            <span className="text-white">{company.incorporationDate}</span>
-          </div>
-          <div>
-            <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Director Contagion Risk</span>
-            <span className="text-emerald-400 font-bold">LOW (0 Adverse Links)</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Commercial Workspace Tabs */}
       <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
@@ -332,7 +372,7 @@ function CommercialSubjectContent() {
             <TabPanel className="p-5 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-medium text-white">Trade Credit Payment Experiences</h3>
+                  <h2 className="text-lg font-medium text-white">Trade Credit Payment Experiences</h2>
                   <p className="text-xs text-[var(--cds-text-secondary)]">
                     Reported commercial trade lines documenting credit terms, promptness, and Days Beyond Terms (DBT).
                   </p>
@@ -340,7 +380,12 @@ function CommercialSubjectContent() {
                 <Tag type="green" size="sm" className="font-mono m-0">Avg DBT: +4 Days (Prompt)</Tag>
               </div>
 
-              <div className="border border-[var(--cds-border-subtle)] overflow-x-auto">
+              <div
+                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Trade Credit Payment Experiences Table"
+              >
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
@@ -359,10 +404,10 @@ function CommercialSubjectContent() {
                       <tr key={idx} className="hover:bg-[var(--cds-layer-02)] transition-colors">
                         <td className="p-3 font-medium text-white">{tx.supplierCategory}</td>
                         <td className="p-3 font-mono text-[var(--cds-text-secondary)]">{tx.terms}</td>
-                        <td className="p-3 text-right font-mono text-gray-300">${tx.creditLimit.toLocaleString()}</td>
-                        <td className="p-3 text-right font-mono text-gray-300">${tx.recentHighCredit.toLocaleString()}</td>
+                        <td className="p-3 text-right font-mono text-[#c6c6c6]">${tx.creditLimit.toLocaleString()}</td>
+                        <td className="p-3 text-right font-mono text-[#c6c6c6]">${tx.recentHighCredit.toLocaleString()}</td>
                         <td className="p-3 text-right font-mono font-bold text-white">${tx.totalOwing.toLocaleString()}</td>
-                        <td className={`p-3 text-right font-mono font-bold ${tx.pastDue > 0 ? 'text-yellow-400' : 'text-emerald-400'}`}>
+                        <td className={`p-3 text-right font-mono font-bold ${tx.pastDue > 0 ? 'text-[#f1c21b]' : 'text-[#42be65]'}`}>
                           ${tx.pastDue.toLocaleString()}
                         </td>
                         <td className="p-3 font-mono text-white">{tx.dbt}</td>
@@ -383,7 +428,7 @@ function CommercialSubjectContent() {
               <div>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
                   <div>
-                    <h3 className="text-lg font-medium text-white">Dynamic Director Contagion Network</h3>
+                    <h2 className="text-lg font-medium text-white">Dynamic Director Contagion Network</h2>
                     <p className="text-xs text-[var(--cds-text-secondary)]">
                       Interactive corporate registry topology mapping directorships, cross-guarantees, and corporate group contagion risk.
                     </p>
@@ -518,28 +563,29 @@ function CommercialSubjectContent() {
                         </div>
                         <div className="text-right">
                           <Tag type="green" size="sm" className="m-0 font-mono">CONTAGION: {dir.contagionRisk}</Tag>
-                          <div className="text-[10px] font-mono text-gray-400 mt-1">INDIVIDUAL SCORE: {dir.score}</div>
+                          <div className="text-[10px] font-mono text-[#8d8d8d] mt-1">INDIVIDUAL SCORE: {dir.score}</div>
                         </div>
                       </div>
 
-                      <div className="text-xs font-semibold uppercase tracking-wider text-[var(--cds-text-helper)] mb-2">
-                        Interrelated Directorships & Corporate Linkages:
-                      </div>
-
+                      {/* Associated entities for this director */}
                       <div className="space-y-2">
-                        {dir.linkedEntities.map((ent: any, eIdx: number) => (
-                          <div key={eIdx} className="p-2.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-center justify-between text-xs">
+                        <div className="text-[10px] uppercase font-mono text-[var(--cds-text-helper)]">
+                          Other Monitored Directorships:
+                        </div>
+                        {dir.associatedEntities.map((ent: any, eIdx: number) => (
+                          <div
+                            key={eIdx}
+                            className="p-2.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-center justify-between"
+                          >
                             <div>
-                              <div className="font-medium text-white">{ent.name}</div>
-                              <div className="text-[11px] font-mono text-[var(--cds-text-secondary)]">ACN: {ent.acn}</div>
+                              <div className="text-xs text-white font-medium">{ent.name}</div>
+                              <div className="text-[10px] font-mono text-[var(--cds-text-helper)]">{ent.acn}</div>
                             </div>
-                            <div className="text-right font-mono">
-                              <Tag type={ent.status.includes('ACTIVE') ? 'green' : 'gray'} size="sm" className="m-0">
-                                {ent.status.split(' ')[0]}
+                            <div className="text-right">
+                              <Tag type={ent.riskTag as any} size="sm" className="m-0 font-mono">
+                                {ent.status}
                               </Tag>
-                              {ent.score > 0 && (
-                                <div className="text-[10px] text-gray-400 mt-1">PAYDEX: {ent.score}</div>
-                              )}
+                              <div className="text-[10px] text-[#8d8d8d] mt-1">PAYDEX: {ent.score}</div>
                             </div>
                           </div>
                         ))}
@@ -562,7 +608,12 @@ function CommercialSubjectContent() {
                 <Tag type="blue" size="sm" className="font-mono m-0">2 Effective Registrations</Tag>
               </div>
 
-              <div className="border border-[var(--cds-border-subtle)] overflow-x-auto">
+              <div
+                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="PPSR Registered Charges Table"
+              >
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
@@ -579,7 +630,7 @@ function CommercialSubjectContent() {
                         <td className="p-3 font-mono text-[var(--cds-link-primary)]">{p.ppsrId}</td>
                         <td className="p-3 font-medium text-white">{p.securedParty}</td>
                         <td className="p-3 text-[var(--cds-text-secondary)]">{p.collateralType}</td>
-                        <td className="p-3 font-mono text-gray-400">{p.registrationDate}</td>
+                        <td className="p-3 font-mono text-[#8d8d8d]">{p.registrationDate}</td>
                         <td className="p-3">
                           <Tag type="green" size="sm" className="m-0 font-mono">{p.status}</Tag>
                         </td>
@@ -592,32 +643,32 @@ function CommercialSubjectContent() {
 
             {/* TAB 4: FINANCIAL RATIOS */}
             <TabPanel className="p-5 md:p-6">
-              <h3 className="text-lg font-medium text-white mb-2">Statutory Liquidity & Capital Ratios (APRA APS 220)</h3>
+              <h2 className="text-lg font-medium text-white mb-2">Statutory Liquidity & Capital Ratios (APRA APS 220)</h2>
               <p className="text-xs text-[var(--cds-text-secondary)] mb-4">
                 Prudential financial health benchmarks derived from audited filings and corporate tax disclosures.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
                 <div className="p-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                  <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Current Ratio (Liquidity)</div>
-                  <div className="text-2xl font-bold text-white mt-1">2.14x</div>
-                  <div className="text-emerald-400 text-[11px] mt-1">Optimal &bull; Benchmarked &ge; 1.50x</div>
+                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Current Ratio (Working Capital)</span>
+                  <div className="text-xl font-bold text-white mt-1">2.42x</div>
+                  <div className="text-[#42be65] text-[11px] mt-1">Optimal &bull; Benchmarked &ge; 1.50x</div>
                 </div>
                 <div className="p-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                  <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Debt-to-Equity Ratio</div>
-                  <div className="text-2xl font-bold text-white mt-1">0.48x</div>
-                  <div className="text-emerald-400 text-[11px] mt-1">Conservative Leverage</div>
+                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Debt-to-Equity Ratio</span>
+                  <div className="text-xl font-bold text-white mt-1">0.38x</div>
+                  <div className="text-[#42be65] text-[11px] mt-1">Conservative Leverage</div>
                 </div>
                 <div className="p-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                  <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Interest Coverage Ratio (DSCR)</div>
-                  <div className="text-2xl font-bold text-white mt-1">6.82x</div>
-                  <div className="text-emerald-400 text-[11px] mt-1">Robust Debt Serviceability</div>
+                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Interest Cover (EBITDA / Int)</span>
+                  <div className="text-xl font-bold text-white mt-1">8.60x</div>
+                  <div className="text-[#42be65] text-[11px] mt-1">Robust Debt Serviceability</div>
                 </div>
               </div>
             </TabPanel>
 
             {/* TAB 5: AUDIT TRAIL */}
             <TabPanel className="p-5 md:p-6">
-              <h3 className="text-lg font-medium text-white mb-2">Bitemporal Corporate Audit Log</h3>
+              <h2 className="text-lg font-medium text-white mb-2">Bitemporal Corporate Audit Log</h2>
               <p className="text-xs text-[var(--cds-text-secondary)] mb-4">
                 Immutable cryptographic ledger events recording trade payments, director updates, and registry pulls.
               </p>

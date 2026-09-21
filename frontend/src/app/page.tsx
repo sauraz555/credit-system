@@ -47,8 +47,8 @@ export default function Home() {
       .then(data => {
         if (data) setStats(data);
       })
-      .catch(() => {
-        // Fallback to default stats if backend offline
+      .catch((err) => {
+        console.warn("Bureau stats offline, utilizing fallback baseline:", err);
       });
   }, []);
 
@@ -67,7 +67,9 @@ export default function Home() {
             setSearchResults(data.entities);
           }
         })
-        .catch(() => {})
+        .catch((err) => {
+          console.warn("Search lookup error:", err);
+        })
         .finally(() => setIsSearching(false));
     }, 200);
 
@@ -129,7 +131,12 @@ export default function Home() {
               Direct File Lookup
             </div>
             <form onSubmit={handleOpenSearch} className="flex gap-2">
+              <label htmlFor="direct-file-lookup-input" className="sr-only">
+                Direct File Lookup
+              </label>
               <input
+                id="direct-file-lookup-input"
+                aria-label="Search File ID, ABN, ACN, or Name"
                 type="text"
                 placeholder="Search File ID, ABN, ACN, or Name..."
                 value={searchQuery}
@@ -239,10 +246,10 @@ export default function Home() {
           <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <Tag type="blue" size="sm" className="m-0 font-mono">CONSUMER PORTAL</Tag>
-                <ArrowRight size={16} className="text-gray-400 group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                <Tag type="cyan" size="sm" className="m-0 font-mono">COMMERCIAL</Tag>
+                <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">Individual Credit Report</h3>
+              <h2 className="text-lg font-medium text-white mb-2">Commercial Credit Assessment</h2>
               <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
                 Inspect comprehensive consumer files, 24-month RHI calendars, adverse default records, and interactive what-if score simulations.
               </p>
@@ -280,16 +287,16 @@ export default function Home() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <Tag type="purple" size="sm" className="m-0 font-mono">API & INGEST</Tag>
-                <ArrowRight size={16} className="text-gray-400 group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">Provider Ingestion Console</h3>
+              <h2 className="text-lg font-medium text-white mb-2">Provider Ingestion Console</h2>
               <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
                 Credit provider gateway for batch CSV and real-time JSON submission with statutory validation (debt &ge;$150, 60+ days, notice given).
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
               <span>National Australia Bank (NAB-001)</span>
-              <span className="font-mono text-emerald-400">ACTIVE</span>
+              <span className="font-mono text-[#42be65]">ACTIVE</span>
             </div>
           </div>
         </Link>
@@ -300,16 +307,16 @@ export default function Home() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <Tag type="magenta" size="sm" className="m-0 font-mono">REGULATION</Tag>
-                <ArrowRight size={16} className="text-gray-400 group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">Analyst & Dispute Console</h3>
+              <h2 className="text-lg font-medium text-white mb-2">Analyst & Dispute Console</h2>
               <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
                 Supervisory tools for dynamic model weights versioning (v1.0 vs v2.0), Director Network contagion graphs, and statutory dispute resolution.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
               <span>Section 20V Dispute Queue</span>
-              <span className="font-mono text-yellow-400">{stats.open_disputes_count} PENDING</span>
+              <span className="font-mono text-[#f1c21b]">{stats.open_disputes_count} PENDING</span>
             </div>
           </div>
         </Link>
@@ -327,7 +334,12 @@ export default function Home() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div
+          className="overflow-x-auto"
+          tabIndex={0}
+          role="region"
+          aria-label="Live Bitemporal Event Stream Table"
+        >
           <table className="w-full text-left text-xs font-mono">
             <thead>
               <tr className="text-[var(--cds-text-secondary)] text-[10px] uppercase border-b border-[var(--cds-border-subtle)]">
@@ -344,24 +356,24 @@ export default function Home() {
                 <td className="py-2 text-[var(--cds-link-primary)]">TX-2026-99014</td>
                 <td className="py-2 text-white">RHI_MONTHLY_REPORT</td>
                 <td className="py-2 text-[var(--cds-text-secondary)]">IND-8842-1994 (J. Vance)</td>
-                <td className="py-2 text-gray-400">2026-09-01 00:00:00</td>
-                <td className="py-2 text-gray-400">2026-09-21 08:30:12</td>
+                <td className="py-2 text-[#8d8d8d]">2026-09-01 00:00:00</td>
+                <td className="py-2 text-[#8d8d8d]">2026-09-21 08:30:12</td>
                 <td className="py-2"><Tag type="green" size="sm" className="m-0">COMMITTED</Tag></td>
               </tr>
               <tr>
                 <td className="py-2 text-[var(--cds-link-primary)]">TX-2026-99013</td>
                 <td className="py-2 text-white">HARD_ENQUIRY_LOGGED</td>
                 <td className="py-2 text-[var(--cds-text-secondary)]">ACN-109-283-912 (Apex)</td>
-                <td className="py-2 text-gray-400">2026-09-20 16:42:00</td>
-                <td className="py-2 text-gray-400">2026-09-20 16:42:01</td>
+                <td className="py-2 text-[#8d8d8d]">2026-09-20 16:42:00</td>
+                <td className="py-2 text-[#8d8d8d]">2026-09-20 16:42:01</td>
                 <td className="py-2"><Tag type="green" size="sm" className="m-0">COMMITTED</Tag></td>
               </tr>
               <tr>
                 <td className="py-2 text-[var(--cds-link-primary)]">TX-2026-99012</td>
                 <td className="py-2 text-white">DISPUTE_STATUS_AMENDED</td>
                 <td className="py-2 text-[var(--cds-text-secondary)]">DEF-TEL-2024-881 (Telstra)</td>
-                <td className="py-2 text-gray-400">2026-08-19 09:11:00</td>
-                <td className="py-2 text-gray-400">2026-08-19 09:11:05</td>
+                <td className="py-2 text-[#8d8d8d]">2026-08-19 09:11:00</td>
+                <td className="py-2 text-[#8d8d8d]">2026-08-19 09:11:05</td>
                 <td className="py-2"><Tag type="purple" size="sm" className="m-0">UNDER REVIEW</Tag></td>
               </tr>
             </tbody>

@@ -35,22 +35,37 @@ export default function CreditReportPage() {
   const routeId = (params?.id as string) || "IND-8842-1994";
   const [liveReport, setLiveReport] = useState<any>(null);
   const [isLoadingApi, setIsLoadingApi] = useState<boolean>(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [isForbidden, setIsForbidden] = useState<boolean>(false);
 
-  // Fetch live bureau report on mount/param change
   // Fetch live bureau report on mount/param change
   useEffect(() => {
     if (!routeId) return;
     setIsLoadingApi(true);
+    setReportError(null);
+    setIsForbidden(false);
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     fetch(`http://localhost:8000/api/reports/${encodeURIComponent(routeId)}`, { headers })
-      .then(res => res.ok ? res.json() : null)
+      .then(async (res) => {
+        if (res.status === 403) {
+          setIsForbidden(true);
+          throw new Error('403 Forbidden: Insufficient permissions to access this consumer credit report.');
+        }
+        if (!res.ok) {
+          throw new Error(`Failed to load consumer report (HTTP ${res.status})`);
+        }
+        return res.json();
+      })
       .then(data => {
         if (data) setLiveReport(data);
       })
-      .catch((err) => console.error("Error fetching credit report", err))
+      .catch((err) => {
+        console.error("Error fetching credit report", err);
+        setReportError(err.message || 'Error fetching consumer credit file');
+      })
       .finally(() => setIsLoadingApi(false));
   }, [routeId]);
 
@@ -222,9 +237,9 @@ export default function CreditReportPage() {
       case '6':
         return <span className="inline-block w-6 h-6 leading-6 text-center text-xs font-mono font-bold bg-[#da1e28] text-white" title={`${val}: 60+ days overdue`}>{val}</span>;
       case 'X':
-        return <span className="inline-block w-6 h-6 leading-6 text-center text-xs font-mono bg-[#525252] text-gray-300" title="X: No data / Not reported">X</span>;
+        return <span className="inline-block w-6 h-6 leading-6 text-center text-xs font-mono bg-[#525252] text-[#c6c6c6]" title="X: No data / Not reported">X</span>;
       case 'C':
-        return <span className="inline-block w-6 h-6 leading-6 text-center text-xs font-mono bg-[#262626] text-gray-400" title="C: Account closed">C</span>;
+        return <span className="inline-block w-6 h-6 leading-6 text-center text-xs font-mono bg-[#262626] text-[#8d8d8d]" title="C: Account closed">C</span>;
       default:
         return <span className="font-mono text-xs">{val}</span>;
     }
@@ -326,7 +341,7 @@ export default function CreditReportPage() {
             </div>
             <div className="border-l border-[var(--cds-border-subtle)] pl-4">
               <div className="text-[var(--cds-text-helper)] uppercase text-[10px] tracking-wider">Ledger State</div>
-              <div className="font-mono text-emerald-400 font-semibold">SYNCED (Bitemporal)</div>
+              <div className="font-mono text-[#42be65] font-semibold">SYNCED (Bitemporal)</div>
             </div>
           </div>
         </div>
@@ -387,7 +402,7 @@ export default function CreditReportPage() {
               <span className="text-5xl font-mono font-bold leading-none text-white tabular-nums">
                 {snapshotData.score}
               </span>
-              <div className="text-xs font-mono text-emerald-400 font-semibold">
+              <div className="text-xs font-mono text-[#42be65] font-semibold">
                 ▲ +14 pts (30d)
               </div>
             </div>
@@ -401,10 +416,10 @@ export default function CreditReportPage() {
             </div>
             {/* Calibrated score bar with zones */}
             <div className="w-full h-2 bg-[var(--cds-layer-02)] relative overflow-hidden flex">
-              <div className="h-full bg-red-800" style={{ width: '30%' }} />
-              <div className="h-full bg-yellow-700" style={{ width: '20%' }} />
-              <div className="h-full bg-blue-600" style={{ width: '25%' }} />
-              <div className="h-full bg-emerald-600" style={{ width: '25%' }} />
+              <div className="h-full bg-[#da1e28]" style={{ width: '30%' }} />
+              <div className="h-full bg-[#f1c21b]" style={{ width: '20%' }} />
+              <div className="h-full bg-[#0f62fe]" style={{ width: '25%' }} />
+              <div className="h-full bg-[#24a148]" style={{ width: '25%' }} />
               <div 
                 className="absolute top-0 bottom-0 w-1.5 bg-white -ml-0.5" 
                 style={{ left: `${(snapshotData.score / 1000) * 100}%` }}
@@ -438,13 +453,13 @@ export default function CreditReportPage() {
           <div className="mt-4">
             <div className="w-full h-2 bg-[var(--cds-layer-02)] relative overflow-hidden">
               <div 
-                className={`h-full ${snapshotData.utilization > 50 ? 'bg-red-500' : snapshotData.utilization > 30 ? 'bg-yellow-500' : 'bg-[#0f62fe]'}`}
+                className={`h-full ${snapshotData.utilization > 50 ? 'bg-[#da1e28]' : snapshotData.utilization > 30 ? 'bg-[#f1c21b]' : 'bg-[#0f62fe]'}`}
                 style={{ width: `${Math.min(100, snapshotData.utilization)}%` }}
               />
             </div>
             <div className="flex justify-between text-xs text-[var(--cds-text-secondary)] mt-2.5">
               <span>Available Line: <strong className="font-mono text-white">${(48500 - snapshotData.totalDebt).toLocaleString()}</strong></span>
-              <span className="text-emerald-400 font-semibold">Benchmark &lt;30%</span>
+              <span className="text-[#42be65] font-semibold">Benchmark &lt;30%</span>
             </div>
           </div>
         </div>
@@ -532,12 +547,17 @@ export default function CreditReportPage() {
                 {/* Left Col: Scoring Waterfall Decomposition */}
                 <div className="lg:col-span-7 space-y-6">
                   <div>
-                    <h3 className="text-lg font-medium text-white mb-1.5">Score Decomposition & Factor Weights</h3>
+                    <h2 className="text-lg font-medium text-white mb-1.5">Score Decomposition & Factor Weights</h2>
                     <p className="text-xs text-[var(--cds-text-secondary)] mb-4 leading-relaxed">
                       Deterministic score attribution derived from Australian Comprehensive Credit Reporting (CCR) inputs. Baseline model starts at 500 points.
                     </p>
 
-                    <div className="border border-[var(--cds-border-subtle)] bg-[var(--cds-layer-02)] overflow-x-auto">
+                    <div
+                      className="border border-[var(--cds-border-subtle)] bg-[var(--cds-layer-02)] overflow-x-auto"
+                      tabIndex={0}
+                      role="region"
+                      aria-label="Risk Factor Attribution Table"
+                    >
                       <table className="w-full text-left text-xs">
                         <thead>
                           <tr className="border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase tracking-wider text-[11px]">
@@ -551,32 +571,32 @@ export default function CreditReportPage() {
                           <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
                             <td className="p-3 font-medium text-white">Consistent 12m Repayment Track</td>
                             <td className="p-3 text-[var(--cds-text-secondary)]">RHI Reliability (98.6%)</td>
-                            <td className="p-3 text-emerald-400 font-mono font-bold">+48 pts</td>
-                            <td className="p-3 text-center"><CheckmarkOutline className="text-emerald-400 inline" size={16} /></td>
+                            <td className="p-3 text-[#42be65] font-mono font-bold">+48 pts</td>
+                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#42be65] inline" size={16} /></td>
                           </tr>
                           <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
                             <td className="p-3 font-medium text-white">Revolving Utilisation &lt; 30%</td>
                             <td className="p-3 text-[var(--cds-text-secondary)]">Capacity / Liquidity</td>
-                            <td className="p-3 text-emerald-400 font-mono font-bold">+15 pts</td>
-                            <td className="p-3 text-center"><CheckmarkOutline className="text-emerald-400 inline" size={16} /></td>
+                            <td className="p-3 text-[#42be65] font-mono font-bold">+15 pts</td>
+                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#42be65] inline" size={16} /></td>
                           </tr>
                           <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
                             <td className="p-3 font-medium text-white">Seasoned Account Longevity</td>
                             <td className="p-3 text-[var(--cds-text-secondary)]">Credit History (Avg 6.4y)</td>
-                            <td className="p-3 text-emerald-400 font-mono font-bold">+22 pts</td>
-                            <td className="p-3 text-center"><CheckmarkOutline className="text-emerald-400 inline" size={16} /></td>
+                            <td className="p-3 text-[#42be65] font-mono font-bold">+22 pts</td>
+                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#42be65] inline" size={16} /></td>
                           </tr>
                           <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
                             <td className="p-3 font-medium text-white">Telstra Consumer Default ($420)</td>
                             <td className="p-3 text-[var(--cds-text-secondary)]">Adverse Listing (Under Dispute)</td>
-                            <td className="p-3 text-red-400 font-mono font-bold">-45 pts</td>
-                            <td className="p-3 text-center"><ErrorIcon className="text-red-400 inline" size={16} /></td>
+                            <td className="p-3 text-[#fa4d56] font-mono font-bold">-45 pts</td>
+                            <td className="p-3 text-center"><ErrorIcon className="text-[#fa4d56] inline" size={16} /></td>
                           </tr>
                           <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
                             <td className="p-3 font-medium text-white">Recent Credit Velocity (3 Enquiries)</td>
                             <td className="p-3 text-[var(--cds-text-secondary)]">Hard Inquiries (12m)</td>
-                            <td className="p-3 text-yellow-400 font-mono font-bold">-8 pts</td>
-                            <td className="p-3 text-center"><Warning className="text-yellow-400 inline" size={16} /></td>
+                            <td className="p-3 text-[#f1c21b] font-mono font-bold">-8 pts</td>
+                            <td className="p-3 text-center"><Warning className="text-[#f1c21b] inline" size={16} /></td>
                           </tr>
                           <tr className="bg-[var(--cds-layer-01)] font-bold">
                             <td className="p-3 text-white" colSpan={2}>Net Calculated Credit Score</td>
@@ -613,7 +633,7 @@ export default function CreditReportPage() {
                       <div className="p-3 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
                         <div className="text-[10px] text-[var(--cds-text-helper)] uppercase font-medium">Personal Loans</div>
                         <div className="text-base font-mono font-bold text-white mt-1">$0.00</div>
-                        <div className="text-[10px] text-emerald-400 mt-0.5">Closed / Settled</div>
+                        <div className="text-[10px] text-[#42be65] mt-0.5">Closed / Settled</div>
                       </div>
                     </div>
                   </div>
@@ -629,7 +649,7 @@ export default function CreditReportPage() {
                           Live "What-If" Score Simulator
                         </h4>
                       </div>
-                      <span className="text-[10px] font-mono bg-blue-950/60 text-blue-400 px-2 py-0.5 border border-blue-800">
+                      <span className="text-[10px] font-mono bg-[#002d9c] text-[#4589ff] px-2 py-0.5 border border-[#0043ce]">
                         Interactive Model
                       </span>
                     </div>
@@ -643,10 +663,12 @@ export default function CreditReportPage() {
                       {/* Control 1: Debt Paydown Slider */}
                       <div>
                         <div className="flex justify-between text-xs mb-2">
-                          <span className="text-white font-medium">Pay Down Revolving Debt:</span>
-                          <span className="font-mono text-emerald-400 font-bold">${simDebtPaydown.toLocaleString()}</span>
+                          <label htmlFor="sim-debt-paydown-slider" className="text-white font-medium">Pay Down Revolving Debt:</label>
+                          <span className="font-mono text-[#42be65] font-bold">${simDebtPaydown.toLocaleString()}</span>
                         </div>
                         <input
+                          id="sim-debt-paydown-slider"
+                          aria-label="Pay down revolving debt slider"
                           type="range"
                           min="0"
                           max="12340"
@@ -670,7 +692,7 @@ export default function CreditReportPage() {
                         <button
                           type="button"
                           onClick={() => setSimRemoveDefault(!simRemoveDefault)}
-                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simRemoveDefault ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-[var(--cds-layer-03)] text-gray-400 border-transparent hover:text-white'}`}
+                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simRemoveDefault ? 'bg-[#24a148] text-white border-[#42be65]' : 'bg-[var(--cds-layer-03)] text-[#8d8d8d] border-transparent hover:text-white'}`}
                         >
                           {simRemoveDefault ? 'RESOLVED (+45)' : 'EXCLUDE'}
                         </button>
@@ -685,7 +707,7 @@ export default function CreditReportPage() {
                         <button
                           type="button"
                           onClick={() => setSimNewInquiry(!simNewInquiry)}
-                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simNewInquiry ? 'bg-red-600 text-white border-red-500' : 'bg-[var(--cds-layer-03)] text-gray-400 border-transparent hover:text-white'}`}
+                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simNewInquiry ? 'bg-[#da1e28] text-white border-[#fa4d56]' : 'bg-[var(--cds-layer-03)] text-[#8d8d8d] border-transparent hover:text-white'}`}
                         >
                           {simNewInquiry ? 'APPLIED (-12)' : 'EXCLUDE'}
                         </button>
@@ -708,7 +730,7 @@ export default function CreditReportPage() {
                         </span>
                       </div>
 
-                      <div className={`font-mono text-sm font-bold ${simulatedScore >= snapshotData.score ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <div className={`font-mono text-sm font-bold ${simulatedScore >= snapshotData.score ? 'text-[#42be65]' : 'text-[#fa4d56]'}`}>
                         {simulatedScore >= snapshotData.score ? `+${simulatedScore - snapshotData.score}` : `${simulatedScore - snapshotData.score}`} pts delta
                       </div>
                     </div>
@@ -731,7 +753,7 @@ export default function CreditReportPage() {
             <TabPanel className="p-5 md:p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                 <div>
-                  <h3 className="text-lg font-medium text-white">24-Month Repayment History Information (RHI) Matrix</h3>
+                  <h2 className="text-lg font-medium text-white">24-Month Repayment History Information (RHI) Matrix</h2>
                   <p className="text-xs text-[var(--cds-text-secondary)]">
                     Official CCR monthly codes: 0 = On Time, 1 = 1-29d overdue, 2 = 30-59d, 3-6 = 60+d, X = Not Reported, C = Closed.
                   </p>
@@ -739,6 +761,8 @@ export default function CreditReportPage() {
 
                 <div className="flex items-center gap-3">
                   <input
+                    id="rhi-search-input"
+                    aria-label="Filter provider or account"
                     type="text"
                     placeholder="Filter provider or account..."
                     value={rhiSearch}
@@ -747,6 +771,8 @@ export default function CreditReportPage() {
                   />
 
                   <select
+                    id="rhi-facility-filter"
+                    aria-label="Filter by facility type"
                     value={rhiFilterType}
                     onChange={(e) => setRhiFilterType(e.target.value)}
                     className="bg-[var(--cds-field)] text-white text-xs px-3 py-1.5 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
@@ -764,32 +790,37 @@ export default function CreditReportPage() {
                 <span className="text-[var(--cds-text-helper)] font-bold text-[11px] uppercase tracking-wider">RHI Legend:</span>
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-4 bg-[#198038] text-white text-[10px] font-mono font-bold text-center leading-4 inline-block">0</span>
-                  <span className="text-gray-300">Current (On Time)</span>
+                  <span className="text-[#c6c6c6]">Current (On Time)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-4 bg-[#f1c21b] text-black text-[10px] font-mono font-bold text-center leading-4 inline-block">1</span>
-                  <span className="text-gray-300">1-29d overdue</span>
+                  <span className="text-[#c6c6c6]">1-29d overdue</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-4 bg-[#ff832b] text-black text-[10px] font-mono font-bold text-center leading-4 inline-block">2</span>
-                  <span className="text-gray-300">30-59d overdue</span>
+                  <span className="text-[#c6c6c6]">30-59d overdue</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-4 bg-[#da1e28] text-white text-[10px] font-mono font-bold text-center leading-4 inline-block">3-6</span>
-                  <span className="text-gray-300">60d+ default risk</span>
+                  <span className="text-[#c6c6c6]">60d+ default risk</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-4 h-4 bg-[#525252] text-gray-300 text-[10px] font-mono font-bold text-center leading-4 inline-block">X</span>
-                  <span className="text-gray-300">No data / Grace</span>
+                  <span className="w-4 h-4 bg-[#525252] text-[#c6c6c6] text-[10px] font-mono font-bold text-center leading-4 inline-block">X</span>
+                  <span className="text-[#c6c6c6]">No data / Grace</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-4 h-4 bg-[#262626] text-gray-400 text-[10px] font-mono font-bold text-center leading-4 inline-block">C</span>
-                  <span className="text-gray-300">Account Closed</span>
+                  <span className="w-4 h-4 bg-[#262626] text-[#8d8d8d] text-[10px] font-mono font-bold text-center leading-4 inline-block">C</span>
+                  <span className="text-[#c6c6c6]">Account Closed</span>
                 </div>
               </div>
 
               {/* Comprehensive 24-Month Grid Table */}
-              <div className="border border-[var(--cds-border-subtle)] overflow-x-auto">
+              <div
+                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="24-Month Repayment History Information Grid"
+              >
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
@@ -821,7 +852,7 @@ export default function CreditReportPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-gray-300">${acc.limit.toLocaleString()}</td>
+                          <td className="p-3 text-right font-mono text-[#c6c6c6]">${acc.limit.toLocaleString()}</td>
                           <td className="p-3 text-right font-mono font-bold text-white">${acc.balance.toLocaleString()}</td>
                           {acc.history.map((hVal, hIdx) => (
                             <td key={hIdx} className="p-2 text-center">
@@ -876,7 +907,7 @@ export default function CreditReportPage() {
             <TabPanel className="p-5 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-medium text-white">Active Credit Accounts & CCR Tradelines</h3>
+                  <h2 className="text-lg font-medium text-white">Active Credit Accounts & CCR Tradelines</h2>
                   <p className="text-xs text-[var(--cds-text-secondary)]">
                     Reported by APRA-licensed financial institutions under National Consumer Credit Protection Act 2009.
                   </p>
@@ -886,7 +917,12 @@ export default function CreditReportPage() {
                 </span>
               </div>
 
-              <div className="border border-[var(--cds-border-subtle)] overflow-x-auto">
+              <div
+                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Active Credit Accounts and CCR Tradelines Table"
+              >
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
@@ -905,16 +941,16 @@ export default function CreditReportPage() {
                     {rhiAccounts.map(acc => (
                       <tr key={acc.id} className="hover:bg-[var(--cds-layer-02)] transition-colors">
                         <td className="p-3 font-medium text-white">{acc.provider}</td>
-                        <td className="p-3 font-mono text-gray-300">{acc.accountNumber}</td>
+                        <td className="p-3 font-mono text-[#c6c6c6]">{acc.accountNumber}</td>
                         <td className="p-3 text-[var(--cds-text-secondary)]">{acc.type}</td>
                         <td className="p-3">
                           <Tag type={acc.status.includes('OPEN') ? 'green' : 'gray'} size="sm" className="m-0 font-mono">
                             {acc.status.split(' ')[0]}
                           </Tag>
                         </td>
-                        <td className="p-3 text-right font-mono text-gray-300">${acc.limit.toLocaleString()}</td>
+                        <td className="p-3 text-right font-mono text-[#c6c6c6]">${acc.limit.toLocaleString()}</td>
                         <td className="p-3 text-right font-mono font-bold text-white">${acc.balance.toLocaleString()}</td>
-                        <td className="p-3 text-right font-mono text-gray-300">{acc.minDue}</td>
+                        <td className="p-3 text-right font-mono text-[#c6c6c6]">{acc.minDue}</td>
                         <td className="p-3 font-mono text-[var(--cds-text-helper)]">{acc.opened}</td>
                         <td className="p-3">
                           <button
@@ -935,7 +971,7 @@ export default function CreditReportPage() {
             <TabPanel className="p-5 md:p-6 space-y-6">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-medium text-white">Default Listings & Adverse Credit Infringements</h3>
+                  <h2 className="text-lg font-medium text-white">Default Listings & Adverse Credit Infringements</h2>
                   <Tag type="red" size="sm" className="font-mono m-0">1 Active Listing</Tag>
                 </div>
                 <p className="text-xs text-[var(--cds-text-secondary)] mb-4">
@@ -995,7 +1031,7 @@ export default function CreditReportPage() {
                 </h4>
                 <div className="border border-[var(--cds-border-subtle)] bg-[var(--cds-layer-02)] p-4 text-xs flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <CheckmarkOutline className="text-emerald-400" size={18} />
+                    <CheckmarkOutline className="text-[#42be65]" size={18} />
                     <div>
                       <span className="text-white font-medium">No Court Writs or Judgments Recorded</span>
                       <span className="text-[var(--cds-text-helper)] block text-[11px] mt-0.5">
@@ -1003,7 +1039,7 @@ export default function CreditReportPage() {
                       </span>
                     </div>
                   </div>
-                  <span className="text-emerald-400 font-mono font-bold">CLEARED</span>
+                  <span className="text-[#42be65] font-mono font-bold">CLEARED</span>
                 </div>
               </div>
 
@@ -1014,7 +1050,7 @@ export default function CreditReportPage() {
                 </h4>
                 <div className="border border-[var(--cds-border-subtle)] bg-[var(--cds-layer-02)] p-4 text-xs flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <CheckmarkOutline className="text-emerald-400" size={18} />
+                    <CheckmarkOutline className="text-[#42be65]" size={18} />
                     <div>
                       <span className="text-white font-medium">Nil Bankruptcy or Insolvency Proceedings</span>
                       <span className="text-[var(--cds-text-helper)] block text-[11px] mt-0.5">
@@ -1022,7 +1058,7 @@ export default function CreditReportPage() {
                       </span>
                     </div>
                   </div>
-                  <span className="text-emerald-400 font-mono font-bold">CLEARED</span>
+                  <span className="text-[#42be65] font-mono font-bold">CLEARED</span>
                 </div>
               </div>
             </TabPanel>
@@ -1031,7 +1067,7 @@ export default function CreditReportPage() {
             <TabPanel className="p-5 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-medium text-white">Credit Inquiries Register</h3>
+                  <h2 className="text-lg font-medium text-white">Credit Inquiries Register</h2>
                   <p className="text-xs text-[var(--cds-text-secondary)]">
                     Audit of credit provider access requests in the previous 5 years under Australian Privacy Principle 12.
                   </p>
@@ -1039,7 +1075,12 @@ export default function CreditReportPage() {
                 <Tag type="blue" size="sm" className="font-mono m-0">3 Hard Enquiries (12m)</Tag>
               </div>
 
-              <div className="border border-[var(--cds-border-subtle)] overflow-x-auto">
+              <div
+                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Credit Inquiries Register Table"
+              >
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
@@ -1069,10 +1110,10 @@ export default function CreditReportPage() {
                               CREDIT INQUIRY
                             </Tag>
                           </td>
-                          <td className="p-3 text-right font-mono text-gray-300 font-bold">
+                          <td className="p-3 text-right font-mono text-[#c6c6c6] font-bold">
                             {enq.id.slice(0, 12)}
                           </td>
-                          <td className="p-3 font-mono text-emerald-400 font-bold">
+                          <td className="p-3 font-mono text-[#42be65] font-bold">
                             Logged (Part IIIA)
                           </td>
                         </tr>
@@ -1083,8 +1124,8 @@ export default function CreditReportPage() {
                         <td className="p-3 font-medium text-white">Subject Self-Check</td>
                         <td className="p-3 text-[var(--cds-text-secondary)]">Consumer Access Assessment</td>
                         <td className="p-3"><Tag type="gray" size="sm" className="m-0 font-mono">SOFT INQUIRY</Tag></td>
-                        <td className="p-3 text-right font-mono text-gray-400">N/A</td>
-                        <td className="p-3 font-mono text-emerald-400 font-bold">0 pts</td>
+                        <td className="p-3 text-right font-mono text-[#8d8d8d]">N/A</td>
+                        <td className="p-3 font-mono text-[#42be65] font-bold">0 pts</td>
                       </tr>
                     )}
                   </tbody>
@@ -1095,7 +1136,7 @@ export default function CreditReportPage() {
             {/* TAB 6: HARDSHIP (PART IIIA) */}
             <TabPanel className="p-5 md:p-6 space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-white mb-2">Financial Hardship Arrangements (Section 21QA)</h3>
+                <h2 className="text-lg font-medium text-white mb-2">Financial Hardship Arrangements (Section 21QA)</h2>
                 <div className="mb-4">
                   <InlineNotification
                     kind="info"
@@ -1126,17 +1167,22 @@ export default function CreditReportPage() {
             <TabPanel className="p-5 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-medium text-white">Bitemporal Ledger & Cryptographic Verification</h3>
+                  <h2 className="text-lg font-medium text-white">Bitemporal Ledger & Cryptographic Verification</h2>
                   <p className="text-xs text-[var(--cds-text-secondary)]">
                     Append-only ledger separating Valid Time (when event occurred) from Transaction Time (when bureau recorded it). Never overwritten.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 px-3 py-1 border border-emerald-800 font-mono">
+                <div className="flex items-center gap-2 text-xs text-[#42be65] bg-[#0e2a15] px-3 py-1 border border-[#24a148] font-mono">
                   <CheckmarkOutline size={14} /> LEDGER INTEGRITY VALIDATED
                 </div>
               </div>
 
-              <div className="border border-[var(--cds-border-subtle)] overflow-x-auto">
+              <div
+                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Bitemporal Audit Ledger Table"
+              >
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
@@ -1152,32 +1198,32 @@ export default function CreditReportPage() {
                     <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
                       <td className="p-3 font-mono text-[var(--cds-link-primary)]">EVT-90421-A</td>
                       <td className="p-3 font-medium text-white">RHI_BATCH_APPEND</td>
-                      <td className="p-3 font-mono text-gray-300">2026-09-01 00:00:00</td>
-                      <td className="p-3 font-mono text-gray-300">2026-09-04 14:22:05</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">2026-09-01 00:00:00</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">2026-09-04 14:22:05</td>
                       <td className="p-3 font-mono text-[var(--cds-text-secondary)]">PRV-CBA-001</td>
                       <td className="p-3 font-mono text-[var(--cds-text-helper)] truncate max-w-xs">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
                     </tr>
                     <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
                       <td className="p-3 font-mono text-[var(--cds-link-primary)]">EVT-89212-D</td>
                       <td className="p-3 font-medium text-white">DISPUTE_RAISED</td>
-                      <td className="p-3 font-mono text-gray-300">2026-08-19 09:11:00</td>
-                      <td className="p-3 font-mono text-gray-300">2026-08-19 09:11:02</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">2026-08-19 09:11:00</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">2026-08-19 09:11:02</td>
                       <td className="p-3 font-mono text-[var(--cds-text-secondary)]">SUB-IND-8842</td>
                       <td className="p-3 font-mono text-[var(--cds-text-helper)] truncate max-w-xs">8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4</td>
                     </tr>
                     <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
                       <td className="p-3 font-mono text-[var(--cds-link-primary)]">EVT-71829-M</td>
                       <td className="p-3 font-medium text-white">MORTGAGE_REPORTED</td>
-                      <td className="p-3 font-mono text-gray-300">2026-08-01 00:00:00</td>
-                      <td className="p-3 font-mono text-gray-300">2026-08-03 11:04:12</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">2026-08-01 00:00:00</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">2026-08-03 11:04:12</td>
                       <td className="p-3 font-mono text-[var(--cds-text-secondary)]">PRV-NAB-002</td>
                       <td className="p-3 font-mono text-[var(--cds-text-helper)] truncate max-w-xs">ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb</td>
                     </tr>
                     <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
                       <td className="p-3 font-mono text-[var(--cds-link-primary)]">EVT-64210-F</td>
                       <td className="p-3 font-medium text-white">DEFAULT_LISTED</td>
-                      <td className="p-3 font-mono text-gray-300">2024-02-14 09:00:00</td>
-                      <td className="p-3 font-mono text-gray-300">2024-02-14 09:30:18</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">2024-02-14 09:00:00</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">2024-02-14 09:30:18</td>
                       <td className="p-3 font-mono text-[var(--cds-text-secondary)]">PRV-TEL-049</td>
                       <td className="p-3 font-mono text-[var(--cds-text-helper)] truncate max-w-xs">3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d</td>
                     </tr>

@@ -11,8 +11,7 @@ import {
   Loading,
   Tag
 } from '@carbon/react';
-import { Login, Security, ArrowRight, Reset } from '@carbon/icons-react';
-import CarbonShell from '@/components/CarbonShell';
+import { Login, Locked, UserAvatar, ArrowRight, Reset, Information, Security } from '@carbon/icons-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -144,8 +143,7 @@ function LoginForm() {
   };
 
   return (
-    <CarbonShell>
-      <div style={{ maxWidth: '640px', margin: '3rem auto', padding: '0 1.5rem' }}>
+    <div style={{ maxWidth: '640px', margin: '3rem auto', padding: '0 1.5rem' }}>
         <Tile style={{ padding: '2.5rem', borderTop: '4px solid #0f62fe' }}>
           <div style={{ marginBottom: '2rem' }}>
             <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#0f62fe', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -320,7 +318,6 @@ function LoginForm() {
           </div>
         </Tile>
       </div>
-    </CarbonShell>
   );
 }
 

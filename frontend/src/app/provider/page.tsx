@@ -58,15 +58,31 @@ export default function ProviderDashboard() {
   const [isInquiring, setIsInquiring] = useState(false);
   const [inquiryResult, setInquiryResult] = useState<any>(null);
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(true);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [isForbiddenAudit, setIsForbiddenAudit] = useState(false);
 
   // Fetch live audit events
-  const fetchAuditEvents = () => {
-    fetch('http://localhost:8000/api/ingest/events')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && Array.isArray(data)) setAuditEvents(data);
-      })
-      .catch(() => {});
+  const fetchAuditEvents = async () => {
+    setIsLoadingAudit(true);
+    setAuditError(null);
+    setIsForbiddenAudit(false);
+    try {
+      const res = await fetch('http://localhost:8000/api/ingest/events');
+      if (res.status === 403) {
+        setIsForbiddenAudit(true);
+        throw new Error('403 Forbidden: Insufficient provider permissions to view ingestion audit events.');
+      }
+      if (!res.ok) {
+        throw new Error(`Failed to load audit events (HTTP ${res.status})`);
+      }
+      const data = await res.json();
+      if (Array.isArray(data)) setAuditEvents(data);
+    } catch (err: any) {
+      setAuditError(err.message || 'Error communicating with ingest events endpoint');
+    } finally {
+      setIsLoadingAudit(false);
+    }
   };
 
   useEffect(() => {
@@ -256,7 +272,7 @@ export default function ProviderDashboard() {
             </div>
             <div className="border-l border-[var(--cds-border-subtle)] pl-4">
               <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Monthly Ingestion Quota</div>
-              <div className="text-emerald-400">14,290 / 50,000 Records</div>
+              <div className="text-[#42be65]">14,290 / 50,000 Records</div>
             </div>
           </div>
         </div>
@@ -279,7 +295,7 @@ export default function ProviderDashboard() {
                 <div className="lg:col-span-8 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-base font-medium text-white">Record Ingestion Payload</h3>
+                      <h2 className="text-base font-medium text-white">Record Ingestion Payload</h2>
                       <p className="text-xs text-[var(--cds-text-secondary)]">
                         Select a pre-validated CCR record schema template or paste batch JSON.
                       </p>
@@ -311,11 +327,16 @@ export default function ProviderDashboard() {
                   </div>
 
                   <form onSubmit={handleIngest}>
+                    <label htmlFor="ingest-json-payload" className="sr-only">
+                      Data Ingestion JSON Payload
+                    </label>
                     <textarea
+                      id="ingest-json-payload"
+                      aria-label="Data Ingestion JSON Payload"
                       rows={14}
                       value={jsonPayload}
                       onChange={(e) => setJsonPayload(e.target.value)}
-                      className="w-full bg-[var(--cds-field)] text-emerald-400 font-mono text-xs p-4 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
+                      className="w-full bg-[var(--cds-field)] text-[#42be65] font-mono text-xs p-4 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
                     />
 
                     <div className="flex items-center justify-between mt-4">
@@ -337,12 +358,12 @@ export default function ProviderDashboard() {
 
                   {/* Submission Result Notification */}
                   {ingestResponse && (
-                    <div className="mt-4 p-4 bg-[var(--cds-layer-02)] border border-emerald-800 text-xs font-mono space-y-2">
-                      <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                    <div className="mt-4 p-4 bg-[var(--cds-layer-02)] border border-[#24a148] text-xs font-mono space-y-2">
+                      <div className="flex items-center gap-2 text-[#42be65] font-bold text-sm">
                         <CheckmarkOutline size={16} /> {ingestResponse.status} &bull; EVENT ID: {ingestResponse.eventId}
                       </div>
                       <div className="text-[var(--cds-text-secondary)]">{ingestResponse.message}</div>
-                      <div className="text-gray-400 text-[11px] pt-2 border-t border-[var(--cds-border-subtle)]">
+                      <div className="text-[#8d8d8d] text-[11px] pt-2 border-t border-[var(--cds-border-subtle)]">
                         <div>TX COMMITTED TIME: {ingestResponse.txTime}</div>
                         <div>VALID TIME RECORD: {ingestResponse.validTime}</div>
                         <div className="truncate">STATE HASH: {ingestResponse.hash}</div>
@@ -354,16 +375,16 @@ export default function ProviderDashboard() {
                 {/* Right: Statutory Compliance Rules Checklist */}
                 <div className="lg:col-span-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] p-5 flex flex-col justify-between">
                   <div>
-                    <h4 className="text-sm font-semibold uppercase tracking-wider text-white mb-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-white mb-3">
                       Statutory Compliance Guardrails
-                    </h4>
+                    </h3>
                     <p className="text-xs text-[var(--cds-text-secondary)] mb-4 leading-relaxed">
                       The CRMS ingestion gateway automatically validates incoming events against legislative criteria prior to ledger commit.
                     </p>
 
                     <div className="space-y-3 text-xs">
                       <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-start gap-2.5">
-                        <CheckmarkOutline className="text-emerald-400 mt-0.5" size={16} />
+                        <CheckmarkOutline className="text-[#42be65] mt-0.5" size={16} />
                         <div>
                           <span className="font-semibold text-white block">Minimum Overdue Threshold ($150)</span>
                           <span className="text-[var(--cds-text-secondary)] text-[11px]">
@@ -373,7 +394,7 @@ export default function ProviderDashboard() {
                       </div>
 
                       <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-start gap-2.5">
-                        <CheckmarkOutline className="text-emerald-400 mt-0.5" size={16} />
+                        <CheckmarkOutline className="text-[#42be65] mt-0.5" size={16} />
                         <div>
                           <span className="font-semibold text-white block">60-Day Overdue Rule</span>
                           <span className="text-[var(--cds-text-secondary)] text-[11px]">
@@ -383,7 +404,7 @@ export default function ProviderDashboard() {
                       </div>
 
                       <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-start gap-2.5">
-                        <CheckmarkOutline className="text-emerald-400 mt-0.5" size={16} />
+                        <CheckmarkOutline className="text-[#42be65] mt-0.5" size={16} />
                         <div>
                           <span className="font-semibold text-white block">Section 6Q & 21D Statutory Notices</span>
                           <span className="text-[var(--cds-text-secondary)] text-[11px]">
@@ -393,7 +414,7 @@ export default function ProviderDashboard() {
                       </div>
 
                       <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-start gap-2.5">
-                        <CheckmarkOutline className="text-emerald-400 mt-0.5" size={16} />
+                        <CheckmarkOutline className="text-[#42be65] mt-0.5" size={16} />
                         <div>
                           <span className="font-semibold text-white block">Bitemporal Non-Destructive Write</span>
                           <span className="text-[var(--cds-text-secondary)] text-[11px]">
@@ -416,15 +437,16 @@ export default function ProviderDashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Form Col */}
                 <div className="lg:col-span-5 space-y-4">
-                  <h3 className="text-base font-medium text-white mb-1">Initiate Comprehensive Credit Inquiry</h3>
+                  <h2 className="text-base font-medium text-white mb-1">Initiate Comprehensive Credit Inquiry</h2>
                   <p className="text-xs text-[var(--cds-text-secondary)] mb-4 leading-relaxed">
                     Query an individual consumer or commercial entity file. Hard inquiries are automatically registered in the subject's audit log.
                   </p>
 
                   <form onSubmit={handleRunInquiry} className="space-y-4 text-xs">
                     <div>
-                      <label className="block text-xs font-semibold text-white mb-1">Subject Entity ID</label>
+                      <label htmlFor="inquiry-subject" className="block text-xs font-semibold text-white mb-1">Subject Entity ID</label>
                       <input
+                        id="inquiry-subject"
                         type="text"
                         value={inquirySubject}
                         onChange={(e) => setInquirySubject(e.target.value)}
@@ -433,8 +455,9 @@ export default function ProviderDashboard() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-white mb-1">Inquiry Assessment Classification</label>
+                      <label htmlFor="inquiry-type" className="block text-xs font-semibold text-white mb-1">Inquiry Assessment Classification</label>
                       <select
+                        id="inquiry-type"
                         value={inquiryType}
                         onChange={(e) => setInquiryType(e.target.value)}
                         className="w-full bg-[var(--cds-field)] text-white text-xs p-2.5 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
@@ -446,8 +469,9 @@ export default function ProviderDashboard() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-white mb-1">Facility Type Applied For</label>
+                      <label htmlFor="inquiry-facility" className="block text-xs font-semibold text-white mb-1">Facility Type Applied For</label>
                       <select
+                        id="inquiry-facility"
                         value={inquiryFacility}
                         onChange={(e) => setInquiryFacility(e.target.value)}
                         className="w-full bg-[var(--cds-field)] text-white text-xs p-2.5 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
@@ -460,8 +484,9 @@ export default function ProviderDashboard() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-white mb-1">Credit Limit / Loan Amount Requested ($ AUD)</label>
+                      <label htmlFor="inquiry-amount" className="block text-xs font-semibold text-white mb-1">Credit Limit / Loan Amount Requested ($ AUD)</label>
                       <input
+                        id="inquiry-amount"
                         type="number"
                         value={inquiryAmount}
                         onChange={(e) => setInquiryAmount(e.target.value)}
@@ -504,7 +529,7 @@ export default function ProviderDashboard() {
                       <div className="grid grid-cols-2 gap-3 text-xs">
                         <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
                           <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">Active Adverse Listings:</span>
-                          <span className="font-mono text-yellow-400 font-bold">{inquiryResult.defaultAmount}</span>
+                          <span className="font-mono text-[#f1c21b] font-bold">{inquiryResult.defaultAmount}</span>
                         </div>
                         <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
                           <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">Worst RHI Status (12m):</span>
@@ -512,7 +537,7 @@ export default function ProviderDashboard() {
                         </div>
                       </div>
 
-                      <div className="p-3.5 bg-emerald-950/40 border border-emerald-800 text-xs font-mono text-emerald-400">
+                      <div className="p-3.5 bg-[#0e2a15] border border-[#24a148] text-xs font-mono text-[#42be65]">
                         <div className="font-bold mb-1 flex items-center gap-1.5">
                           <CheckmarkOutline size={14} /> DECISION SUPPORT ENGINE:
                         </div>
@@ -525,7 +550,7 @@ export default function ProviderDashboard() {
                     </div>
                   ) : (
                     <div className="h-64 flex flex-col items-center justify-center text-center text-xs text-[var(--cds-text-helper)] border border-dashed border-[var(--cds-border-subtle)] p-6">
-                      <Search size={32} className="mb-2 text-gray-500" />
+                      <Search size={32} className="mb-2 text-[#6f6f6f]" />
                       <div>No credit pull initiated yet.</div>
                       <div className="text-[11px] mt-1 text-[var(--cds-text-secondary)]">
                         Complete inquiry parameters on the left and submit to request real-time score.
@@ -540,68 +565,81 @@ export default function ProviderDashboard() {
             <TabPanel className="p-5 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-medium text-white">Ingestion Batch Audit Log</h3>
+                  <h2 className="text-lg font-medium text-white">Ingestion Batch Audit Log</h2>
                   <p className="text-xs text-[var(--cds-text-secondary)]">
-                    Historical record of API calls and CSV batches submitted by National Australia Bank (NAB-001).
+                    Historical record of API calls and CSV batches submitted by this credit provider.
                   </p>
                 </div>
                 <Tag type="green" size="sm" className="font-mono m-0">100% Ingestion SLA Met</Tag>
               </div>
 
-              <div className="border border-[var(--cds-border-subtle)] overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead>
-                    <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[10px] tracking-wider">
-                      <th className="p-3">Batch ID</th>
-                      <th className="p-3">Ingestion Type</th>
-                      <th className="p-3">Timestamp</th>
-                      <th className="p-3 text-right">Records Sent</th>
-                      <th className="p-3 text-right">Committed</th>
-                      <th className="p-3 text-right">Rejected</th>
-                      <th className="p-3">Batch Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                    {auditEvents.length > 0 ? (
-                      auditEvents.map((evt) => (
+              {/* 403 Forbidden State */}
+              {isForbiddenAudit && (
+                <div className="p-4 bg-[var(--cds-layer-02)] border-l-4 border-[#da1e28] text-xs mb-4">
+                  <div className="font-bold text-[#fa4d56] uppercase">403 Forbidden: Insufficient Permissions</div>
+                  <div className="text-[var(--cds-text-secondary)] mt-1">Your provider tenant credentials are not authorized to access the bureau audit logs.</div>
+                </div>
+              )}
+
+              {/* Error State */}
+              {auditError && !isForbiddenAudit && (
+                <div className="mb-4">
+                  <InlineNotification
+                    kind="error"
+                    title="Audit Log Ingestion Error"
+                    subtitle={auditError}
+                    lowContrast
+                  />
+                </div>
+              )}
+
+              {/* Focusable Table Region for Axe */}
+              <div
+                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Ingestion Batch Audit Log Table"
+              >
+                {isLoadingAudit ? (
+                  <div className="p-8 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
+                    Loading ingestion batch audit records...
+                  </div>
+                ) : auditEvents.length === 0 ? (
+                  <div className="p-8 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
+                    No ingestion batch records found for this provider.
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[10px] tracking-wider">
+                        <th className="p-3">Batch ID</th>
+                        <th className="p-3">Ingestion Type</th>
+                        <th className="p-3">Timestamp</th>
+                        <th className="p-3 text-right">Records Sent</th>
+                        <th className="p-3 text-right">Committed</th>
+                        <th className="p-3 text-right">Rejected</th>
+                        <th className="p-3">Batch Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--cds-border-subtle)]">
+                      {auditEvents.map((evt) => (
                         <tr key={evt.id} className="hover:bg-[var(--cds-layer-02)] transition-colors">
                           <td className="p-3 text-[var(--cds-link-primary)]">{evt.id.slice(0, 16)}</td>
                           <td className="p-3 text-white">{evt.raw_payload?.record_type || 'JSON_RECORD'}</td>
-                          <td className="p-3 text-gray-400">{evt.created_at || 'Just now'}</td>
-                          <td className="p-3 text-right text-gray-300">1</td>
-                          <td className="p-3 text-right text-emerald-400 font-bold">{evt.status === 'ACCEPTED' ? '1' : '0'}</td>
-                          <td className="p-3 text-right text-red-400">{evt.status === 'REJECTED' ? '1' : '0'}</td>
+                          <td className="p-3 text-[#8d8d8d]">{evt.created_at || 'Just now'}</td>
+                          <td className="p-3 text-right text-[#c6c6c6]">1</td>
+                          <td className="p-3 text-right text-[#42be65] font-bold">{evt.status === 'ACCEPTED' ? '1' : '0'}</td>
+                          <td className="p-3 text-right text-[#fa4d56]">{evt.status === 'REJECTED' ? '1' : '0'}</td>
                           <td className="p-3">
                             <Tag type={evt.status === 'ACCEPTED' ? 'green' : 'red'} size="sm" className="m-0">
                               {evt.status}
                             </Tag>
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <>
-                        <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                          <td className="p-3 text-[var(--cds-link-primary)]">BATCH-NAB-2026-09A</td>
-                          <td className="p-3 text-white">RHI_MONTHLY_BULK_CSV</td>
-                          <td className="p-3 text-gray-400">2026-09-04 14:20:00</td>
-                          <td className="p-3 text-right text-gray-300">12,400</td>
-                          <td className="p-3 text-right text-emerald-400 font-bold">12,398</td>
-                          <td className="p-3 text-right text-gray-400">2</td>
-                          <td className="p-3"><Tag type="green" size="sm" className="m-0">PROCESSED</Tag></td>
-                        </tr>
-                        <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                          <td className="p-3 text-[var(--cds-link-primary)]">BATCH-NAB-2026-08B</td>
-                          <td className="p-3 text-white">DEFAULTS_LISTING_JSON</td>
-                          <td className="p-3 text-gray-400">2026-08-25 09:00:00</td>
-                          <td className="p-3 text-right text-gray-300">42</td>
-                          <td className="p-3 text-right text-emerald-400 font-bold">42</td>
-                          <td className="p-3 text-right text-gray-400">0</td>
-                          <td className="p-3"><Tag type="green" size="sm" className="m-0">PROCESSED</Tag></td>
-                        </tr>
-                      </>
-                    )}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </TabPanel>
           </TabPanels>

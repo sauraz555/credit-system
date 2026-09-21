@@ -90,7 +90,7 @@ export default function CarbonShell({ children }: { children: React.ReactNode })
               />
               <Link href="/" passHref legacyBehavior>
                 <HeaderName prefix="IBM">
-                  Credit Reporting Mechanism &middot; <span className="font-mono text-xs text-gray-400 font-normal">v2.4-enterprise</span>
+                  Credit Reporting Mechanism &middot; <span className="font-mono text-xs text-[#8d8d8d] font-normal">v2.4-enterprise</span>
                 </HeaderName>
               </Link>
 

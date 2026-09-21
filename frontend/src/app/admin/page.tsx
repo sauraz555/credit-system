@@ -39,77 +39,69 @@ export default function AdminAnalystDashboard() {
   const [deploySuccess, setDeploySuccess] = useState(false);
   const [backtestStats, setBacktestStats] = useState<any>(null);
 
-  // Dispute actions state
-  const [disputes, setDisputes] = useState<any[]>([
-    {
-      id: 'DISP-2026-9041',
-      entityId: 'IND-8842-1994',
-      subjectName: 'Jonathan Edward Vance',
-      targetListing: 'DEFAULT ($420.00)',
-      grounds: 'Section 6Q / 21D Statutory Notices Not Received',
-      filedDate: '2026-08-19',
-      daysRemaining: 12,
-      status: 'OPEN',
-      statusTag: 'purple'
-    },
-    {
-      id: 'DISP-2026-8992',
-      entityId: 'IND-1049-1981',
-      subjectName: 'Sarah Lin-Chen',
-      targetListing: 'RHI (Overdue Code 2)',
-      grounds: 'Omission of Approved Financial Hardship Notice',
-      filedDate: '2026-09-02',
-      daysRemaining: 21,
-      status: 'OPEN',
-      statusTag: 'yellow'
-    },
-    {
-      id: 'DISP-2026-8710',
-      entityId: 'ACN-109-283-912',
-      subjectName: 'Apex Industrial Holdings Pty Ltd',
-      targetListing: 'TRADE_PAYMENT ($24,500.00)',
-      grounds: 'Inaccurate Overdue Balance / Bank Clearing Delay',
-      filedDate: '2026-08-01',
-      daysRemaining: 0,
-      status: 'RESOLVED_EXPUNGED',
-      statusTag: 'green'
-    }
-  ]);
+  // Dispute actions state (no mock fallback data)
+  const [disputes, setDisputes] = useState<any[]>([]);
+  const [isLoadingDisputes, setIsLoadingDisputes] = useState(true);
+  const [disputeError, setDisputeError] = useState<string | null>(null);
+  const [isForbiddenDisputes, setIsForbiddenDisputes] = useState(false);
 
   // Network topology state
   const [networkData, setNetworkData] = useState<any>(null);
+  const [isLoadingNetwork, setIsLoadingNetwork] = useState(true);
+  const [networkError, setNetworkError] = useState<string | null>(null);
 
   // Fetch disputes from live API
-  const fetchDisputes = () => {
-    fetch('http://localhost:8000/api/disputes')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && Array.isArray(data) && data.length > 0) {
-          setDisputes(data.map((d: any) => ({
-            id: d.id,
-            entityId: d.entity_id,
-            subjectName: d.subject_name,
-            targetListing: d.target_listing,
-            grounds: d.grounds,
-            filedDate: d.filed_date,
-            daysRemaining: d.days_remaining,
-            status: d.status,
-            statusTag: d.status.includes('EXPUNGED') ? 'green' : d.status.includes('CONFIRM') ? 'gray' : d.days_remaining < 14 ? 'purple' : 'yellow'
-          })));
-        }
-      })
-      .catch(() => {});
+  const fetchDisputes = async () => {
+    setIsLoadingDisputes(true);
+    setDisputeError(null);
+    setIsForbiddenDisputes(false);
+    try {
+      const res = await fetch('http://localhost:8000/api/disputes');
+      if (res.status === 403) {
+        setIsForbiddenDisputes(true);
+        throw new Error('403 Forbidden: Insufficient administrative privileges to view dispute registry.');
+      }
+      if (!res.ok) {
+        throw new Error(`Failed to load disputes (HTTP ${res.status})`);
+      }
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setDisputes(data.map((d: any) => ({
+          id: d.id,
+          entityId: d.entity_id,
+          subjectName: d.subject_name,
+          targetListing: d.target_listing,
+          grounds: d.grounds,
+          filedDate: d.filed_date,
+          daysRemaining: d.days_remaining,
+          status: d.status,
+          statusTag: d.status?.includes('EXPUNGED') ? 'green' : d.status?.includes('CONFIRM') ? 'gray' : d.days_remaining < 14 ? 'purple' : 'teal'
+        })));
+      }
+    } catch (err: any) {
+      setDisputeError(err.message || 'Error communicating with disputes endpoint');
+    } finally {
+      setIsLoadingDisputes(false);
+    }
   };
 
   // Fetch corporate network graph
   useEffect(() => {
     fetchDisputes();
+    setIsLoadingNetwork(true);
+    setNetworkError(null);
     fetch('http://localhost:8000/api/admin/network?limit_companies=8')
-      .then(res => res.ok ? res.json() : null)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(data => {
         if (data) setNetworkData(data);
       })
-      .catch(() => {});
+      .catch((err: any) => {
+        setNetworkError(err.message || 'Error loading corporate network');
+      })
+      .finally(() => setIsLoadingNetwork(false));
   }, []);
 
   const handleResolveDispute = async (dispId: string, action: 'EXPUNGE' | 'CONFIRM') => {
@@ -190,11 +182,11 @@ export default function AdminAnalystDashboard() {
           <div className="flex items-center gap-4 text-xs font-mono bg-[var(--cds-layer-02)] px-4 py-3 border border-[var(--cds-border-subtle)]">
             <div>
               <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Statutory Disputes</div>
-              <div className="text-yellow-400 font-bold">{disputes.filter(d => d.daysRemaining > 0).length} Open (30d SLA)</div>
+              <div className="text-[#f1c21b] font-bold">{disputes.filter(d => d.daysRemaining > 0).length} Open (30d SLA)</div>
             </div>
             <div className="border-l border-[var(--cds-border-subtle)] pl-4">
               <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Algorithm Gini</div>
-              <div className="text-emerald-400 font-bold">0.684 (Calibrated)</div>
+              <div className="text-[#42be65] font-bold">0.684 (Calibrated)</div>
             </div>
           </div>
         </div>
@@ -228,7 +220,7 @@ export default function AdminAnalystDashboard() {
             <TabPanel className="p-5 md:p-6 space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--cds-border-subtle)]">
                 <div>
-                  <h3 className="text-lg font-medium text-white">Algorithm Weight Calibration Engine</h3>
+                  <h2 className="text-lg font-medium text-white">Algorithm Weight Calibration Engine</h2>
                   <p className="text-xs text-[var(--cds-text-secondary)]">
                     Calibrate factor weights across RHI, credit utilisation, default penalties, and inquiry velocity.
                   </p>
@@ -256,10 +248,12 @@ export default function AdminAnalystDashboard() {
                   <div className="p-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] space-y-4">
                     <div>
                       <div className="flex justify-between mb-1.5">
-                        <span className="text-white font-medium">Repayment History Information (RHI) Weight:</span>
-                        <span className="font-mono text-emerald-400 font-bold">{weightRhi}%</span>
+                        <label htmlFor="slider-rhi" className="text-white font-medium">Repayment History Information (RHI) Weight:</label>
+                        <span className="font-mono text-[#42be65] font-bold">{weightRhi}%</span>
                       </div>
                       <input
+                        id="slider-rhi"
+                        aria-label="Repayment History Information Weight"
                         type="range"
                         min="20"
                         max="50"
@@ -271,10 +265,12 @@ export default function AdminAnalystDashboard() {
 
                     <div>
                       <div className="flex justify-between mb-1.5">
-                        <span className="text-white font-medium">Credit Facility Utilisation Weight:</span>
-                        <span className="font-mono text-blue-400 font-bold">{weightUtil}%</span>
+                        <label htmlFor="slider-util" className="text-white font-medium">Credit Facility Utilisation Weight:</label>
+                        <span className="font-mono text-[#4589ff] font-bold">{weightUtil}%</span>
                       </div>
                       <input
+                        id="slider-util"
+                        aria-label="Credit Facility Utilisation Weight"
                         type="range"
                         min="10"
                         max="40"
@@ -286,10 +282,12 @@ export default function AdminAnalystDashboard() {
 
                     <div>
                       <div className="flex justify-between mb-1.5">
-                        <span className="text-white font-medium">Length of Credit History (File Longevity):</span>
-                        <span className="font-mono text-cyan-400 font-bold">{weightHistory}%</span>
+                        <label htmlFor="slider-history" className="text-white font-medium">Length of Credit History (File Longevity):</label>
+                        <span className="font-mono text-[#00bab6] font-bold">{weightHistory}%</span>
                       </div>
                       <input
+                        id="slider-history"
+                        aria-label="Length of Credit History Weight"
                         type="range"
                         min="5"
                         max="30"
@@ -301,10 +299,12 @@ export default function AdminAnalystDashboard() {
 
                     <div>
                       <div className="flex justify-between mb-1.5">
-                        <span className="text-white font-medium">Adverse Listings & Defaults Penalty Weight:</span>
-                        <span className="font-mono text-red-400 font-bold">{weightDefaults}%</span>
+                        <label htmlFor="slider-defaults" className="text-white font-medium">Adverse Listings & Defaults Penalty Weight:</label>
+                        <span className="font-mono text-[#fa4d56] font-bold">{weightDefaults}%</span>
                       </div>
                       <input
+                        id="slider-defaults"
+                        aria-label="Adverse Listings and Defaults Penalty Weight"
                         type="range"
                         min="10"
                         max="50"
@@ -316,10 +316,12 @@ export default function AdminAnalystDashboard() {
 
                     <div>
                       <div className="flex justify-between mb-1.5">
-                        <span className="text-white font-medium">Recent Credit Enquiries Velocity Penalty:</span>
-                        <span className="font-mono text-yellow-400 font-bold">{weightInquiries}%</span>
+                        <label htmlFor="slider-inquiries" className="text-white font-medium">Recent Credit Enquiries Velocity Penalty:</label>
+                        <span className="font-mono text-[#f1c21b] font-bold">{weightInquiries}%</span>
                       </div>
                       <input
+                        id="slider-inquiries"
+                        aria-label="Recent Credit Enquiries Velocity Penalty Weight"
                         type="range"
                         min="1"
                         max="20"
@@ -332,7 +334,7 @@ export default function AdminAnalystDashboard() {
 
                   <div className="pt-4 border-t border-[var(--cds-border-subtle)] flex items-center justify-between">
                     <div className="font-mono text-xs text-[var(--cds-text-secondary)]">
-                      Total Allocated Weight: <strong className={`text-sm ${weightRhi + weightUtil + weightHistory + weightDefaults + weightInquiries === 100 ? 'text-emerald-400' : 'text-red-400'}`}>{weightRhi + weightUtil + weightHistory + weightDefaults + weightInquiries}%</strong>
+                      Total Allocated Weight: <strong className={`text-sm ${weightRhi + weightUtil + weightHistory + weightDefaults + weightInquiries === 100 ? 'text-[#42be65]' : 'text-[#fa4d56]'}`}>{weightRhi + weightUtil + weightHistory + weightDefaults + weightInquiries}%</strong>
                     </div>
 
                     <Button
@@ -350,9 +352,9 @@ export default function AdminAnalystDashboard() {
                 {/* Right: Challenger Model Backtest Metrics */}
                 <div className="lg:col-span-5 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] p-5 flex flex-col justify-between">
                   <div>
-                    <h4 className="text-sm font-semibold uppercase tracking-wider text-white mb-2">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-white mb-2">
                       Challenger Backtest Analysis
-                    </h4>
+                    </h3>
                     <p className="text-xs text-[var(--cds-text-secondary)] mb-4 leading-relaxed">
                       Statistical validation against 50,000 historical consumer loan portfolios over 36-month performance windows.
                     </p>
@@ -360,30 +362,10 @@ export default function AdminAnalystDashboard() {
                     <div className="space-y-3 text-xs">
                       <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-center justify-between">
                         <div>
-                          <span className="text-white font-medium block">Gini Coefficient (Discriminatory Power)</span>
-                          <span className="text-[var(--cds-text-helper)] text-[11px]">Benchmark &gt; 0.60</span>
-                        </div>
-                        <span className="font-mono text-emerald-400 font-bold text-base">
-                          {backtestStats?.gini_index ? backtestStats.gini_index : '0.684 (+0.031)'}
-                        </span>
-                      </div>
-
-                      <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-center justify-between">
-                        <div>
-                          <span className="text-white font-medium block">Kolmogorov-Smirnov (KS Metric)</span>
-                          <span className="text-[var(--cds-text-helper)] text-[11px]">Separation distance</span>
-                        </div>
-                        <span className="font-mono text-emerald-400 font-bold text-base">
-                          {backtestStats?.auc ? `${Math.round(backtestStats.auc * 100)}%` : '44.2%'}
-                        </span>
-                      </div>
-
-                      <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-center justify-between">
-                        <div>
                           <span className="text-white font-medium block">Population Stability Index (PSI)</span>
                           <span className="text-[var(--cds-text-helper)] text-[11px]">Stability threshold &lt; 0.10</span>
                         </div>
-                        <span className="font-mono text-emerald-400 font-bold text-base">0.024 (Stable)</span>
+                        <span className="font-mono text-[#42be65] font-bold text-base">0.024 (Stable)</span>
                       </div>
                     </div>
                   </div>
@@ -409,72 +391,105 @@ export default function AdminAnalystDashboard() {
                 </Tag>
               </div>
 
-              <div className="border border-[var(--cds-border-subtle)] overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead>
-                    <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[10px] tracking-wider">
-                      <th className="p-3">Dispute ID</th>
-                      <th className="p-3 font-sans">Consumer / Entity</th>
-                      <th className="p-3">Target Adverse Listing</th>
-                      <th className="p-3 font-sans">Statutory Grounds</th>
-                      <th className="p-3">Filed Date</th>
-                      <th className="p-3">30-Day SLA Remaining</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Adjudication</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                    {disputes.map(d => (
-                      <tr key={d.id} className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                        <td className="p-3 text-[var(--cds-link-primary)]">{d.id.slice(0, 16)}</td>
-                        <td className="p-3 font-sans font-medium text-white">
-                          <Link href={`/subject/${d.entityId}`} className="hover:underline text-[var(--cds-link-primary)]">
-                            {d.subjectName}
-                          </Link>
-                          <span className="block font-mono text-[10px] text-gray-400">{d.entityId}</span>
-                        </td>
-                        <td className="p-3 text-[var(--cds-text-secondary)]">{d.targetListing}</td>
-                        <td className="p-3 font-sans text-xs text-gray-300 max-w-xs">{d.grounds}</td>
-                        <td className="p-3 text-gray-400">{d.filedDate}</td>
-                        <td className="p-3 font-bold">
-                          {d.daysRemaining > 0 ? (
-                            <span className={d.daysRemaining < 14 ? 'text-red-400' : 'text-emerald-400'}>
-                              {d.daysRemaining} Days Left
-                            </span>
-                          ) : (
-                            <span className="text-gray-500 font-normal">Closed / Resolved</span>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          <Tag type={d.statusTag as any} size="sm" className="m-0 font-mono">
-                            {d.status.replace(/_/g, ' ')}
-                          </Tag>
-                        </td>
-                        <td className="p-3">
-                          {d.daysRemaining > 0 ? (
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleResolveDispute(d.id, 'EXPUNGE')}
-                                className="text-xs text-emerald-400 hover:underline font-medium"
-                              >
-                                Expunge
-                              </button>
-                              <span className="text-[var(--cds-border-strong)]">|</span>
-                              <button
-                                onClick={() => handleResolveDispute(d.id, 'CONFIRM')}
-                                className="text-xs text-gray-400 hover:underline"
-                              >
-                                Confirm
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-[var(--cds-text-helper)]">Archived</span>
-                          )}
-                        </td>
+              {/* Error and 403 States */}
+              {isForbiddenDisputes && (
+                <div className="p-4 bg-[var(--cds-layer-02)] border-l-4 border-[#da1e28] text-xs">
+                  <div className="font-bold text-[#fa4d56] uppercase">403 Forbidden: Insufficient Permissions</div>
+                  <div className="text-[var(--cds-text-secondary)] mt-1">Your account role does not have authorization to view or adjudicate statutory credit disputes.</div>
+                </div>
+              )}
+
+              {disputeError && !isForbiddenDisputes && (
+                <InlineNotification
+                  kind="error"
+                  title="Dispute Register Offline"
+                  subtitle={disputeError}
+                  lowContrast
+                />
+              )}
+
+              {/* Table with focusable region for axe */}
+              <div
+                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Statutory Disputes Registry Table"
+              >
+                {isLoadingDisputes ? (
+                  <div className="p-8 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
+                    Loading dispute registry...
+                  </div>
+                ) : disputes.length === 0 ? (
+                  <div className="p-8 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
+                    No statutory disputes currently pending review in this register.
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[10px] tracking-wider">
+                        <th className="p-3">Dispute ID</th>
+                        <th className="p-3 font-sans">Consumer / Entity</th>
+                        <th className="p-3">Target Adverse Listing</th>
+                        <th className="p-3 font-sans">Statutory Grounds</th>
+                        <th className="p-3">Filed Date</th>
+                        <th className="p-3">30-Day SLA Remaining</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Adjudication</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--cds-border-subtle)]">
+                      {disputes.map(d => (
+                        <tr key={d.id} className="hover:bg-[var(--cds-layer-02)] transition-colors">
+                          <td className="p-3 text-[var(--cds-link-primary)]">{d.id.slice(0, 16)}</td>
+                          <td className="p-3 font-sans font-medium text-white">
+                            <Link href={`/subject/${d.entityId}`} className="hover:underline text-[var(--cds-link-primary)]">
+                              {d.subjectName}
+                            </Link>
+                            <span className="block font-mono text-[10px] text-[#8d8d8d]">{d.entityId}</span>
+                          </td>
+                          <td className="p-3 text-[var(--cds-text-secondary)]">{d.targetListing}</td>
+                          <td className="p-3 font-sans text-xs text-[#c6c6c6] max-w-xs">{d.grounds}</td>
+                          <td className="p-3 text-[#8d8d8d]">{d.filedDate}</td>
+                          <td className="p-3 font-bold">
+                            {d.daysRemaining > 0 ? (
+                              <span className={d.daysRemaining < 14 ? 'text-[#fa4d56]' : 'text-[#42be65]'}>
+                                {d.daysRemaining} Days Left
+                              </span>
+                            ) : (
+                              <span className="text-[#6f6f6f] font-normal">Closed / Resolved</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <Tag type={d.statusTag as any} size="sm" className="m-0 font-mono">
+                              {d.status.replace(/_/g, ' ')}
+                            </Tag>
+                          </td>
+                          <td className="p-3">
+                            {d.daysRemaining > 0 ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleResolveDispute(d.id, 'EXPUNGE')}
+                                  className="text-xs text-[#42be65] hover:underline font-medium"
+                                >
+                                  Expunge
+                                </button>
+                                <span className="text-[var(--cds-border-strong)]">|</span>
+                                <button
+                                  onClick={() => handleResolveDispute(d.id, 'CONFIRM')}
+                                  className="text-xs text-[#8d8d8d] hover:underline"
+                                >
+                                  Confirm
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[var(--cds-text-helper)]">Archived</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </TabPanel>
 
@@ -483,7 +498,7 @@ export default function AdminAnalystDashboard() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-medium text-white mb-1">Bureau Corporate Contagion Network</h3>
+                    <h2 className="text-lg font-medium text-white mb-1">Bureau Corporate Contagion Network</h2>
                     <p className="text-xs text-[var(--cds-text-secondary)]">
                       Topological graph of interrelated companies, directors, and cross-guarantee contagion across monitored entities.
                     </p>
@@ -600,16 +615,16 @@ export default function AdminAnalystDashboard() {
 
             {/* TAB 4: BITEMPORAL INTEGRITY */}
             <TabPanel className="p-5 md:p-6">
-              <h3 className="text-lg font-medium text-white mb-2">Cryptographic Ledger Verification</h3>
+              <h2 className="text-lg font-medium text-white mb-2">Cryptographic Ledger Verification</h2>
               <p className="text-xs text-[var(--cds-text-secondary)] mb-4">
                 SHA-256 Merkle root verification confirming zero ledger tampering and strict non-destructive append integrity.
               </p>
 
-              <div className="p-4 bg-black/60 border border-[var(--cds-border-subtle)] font-mono text-xs space-y-2 text-emerald-400">
+              <div className="p-4 bg-black/60 border border-[var(--cds-border-subtle)] font-mono text-xs space-y-2 text-[#42be65]">
                 <div>[CHECK_1] MERKLE_TREE_ROOT: 7a82b904fc0192e104ca819201f42199201a0942cba8192104ab0192ca1bbdca</div>
                 <div>[CHECK_2] TRANSACTION_CHAIN_VALIDATION: 842,109 BLOCKS VERIFIED WITHOUT DISCREPANCY</div>
                 <div>[CHECK_3] BITEMPORAL_OVERWRITE_CHECK: 0 OVERWRITE DETECTIONS FOUND (100.0% COMPLIANT)</div>
-                <div className="text-white pt-2 border-t border-gray-800">STATUS: AUDIT CERTIFICATE ISSUED (OAIC APRA COMPLIANT)</div>
+                <div className="text-white pt-2 border-t border-[#393939]">STATUS: AUDIT CERTIFICATE ISSUED (OAIC APRA COMPLIANT)</div>
               </div>
             </TabPanel>
           </TabPanels>

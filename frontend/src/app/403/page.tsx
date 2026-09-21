@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button, Tile, InlineNotification } from '@carbon/react';
 import { MisuseOutline, Logout, ArrowLeft } from '@carbon/icons-react';
-import CarbonShell from '@/components/CarbonShell';
 
 export default function ForbiddenPage() {
   const [currentRole, setCurrentRole] = useState<string>('UNKNOWN');
@@ -25,8 +24,7 @@ export default function ForbiddenPage() {
   };
 
   return (
-    <CarbonShell>
-      <div style={{ maxWidth: '720px', margin: '4rem auto', padding: '0 1.5rem' }}>
+    <div style={{ maxWidth: '720px', margin: '4rem auto', padding: '0 1.5rem' }}>
         <Tile style={{ padding: '2.5rem', borderLeft: '4px solid #da1e28' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
             <div style={{ background: 'rgba(218, 30, 40, 0.15)', padding: '0.75rem', borderRadius: '2px' }}>
@@ -69,6 +67,5 @@ export default function ForbiddenPage() {
           </div>
         </Tile>
       </div>
-    </CarbonShell>
   );
 }
