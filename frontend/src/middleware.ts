@@ -62,6 +62,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/403') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
+    pathname.startsWith('/health') ||
     pathname === '/favicon.ico'
   ) {
     return NextResponse.next();
