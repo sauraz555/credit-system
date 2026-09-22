@@ -20,7 +20,7 @@ import { I18nProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "Credit Reporting Mechanism",
-  description: "Enterprise Credit Scoring & Reporting Platform",
+  description: "Nepal Credit Information Bureau (CIB) statutory reporting and credit evaluation portal.",
 };
 
 /**
