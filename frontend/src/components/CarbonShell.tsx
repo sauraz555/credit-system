@@ -1,5 +1,5 @@
 /**
- * IBM Carbon Design System Application Shell Component.
+ * Carbon Design System Application Shell Component.
  *
  * Provides persistent enterprise navigation framing, Carbon Design System dark/light
  * theme switching ('g100' and 'g10'), role-aware profile presentation, session sign-out,
@@ -63,7 +63,7 @@ export interface CarbonShellProps {
  * Root enterprise Carbon Design System navigation shell.
  *
  * @param props - CarbonShellProps containing page children.
- * @returns JSX.Element wrapping page content in IBM Carbon header, side-nav, and theme context.
+ * @returns JSX.Element wrapping page content in Carbon header, side-nav, and theme context.
  */
 export default function CarbonShell({ children }: CarbonShellProps) {
   const pathname = usePathname();
@@ -72,10 +72,21 @@ export default function CarbonShell({ children }: CarbonShellProps) {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
+  const gitSha = process.env.NEXT_PUBLIC_GIT_SHA || '01b7736';
+  const [pickedEntity, setPickedEntity] = useState<{ id: string; name: string } | null>(null);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setUserRole(localStorage.getItem('user_role'));
       setUserEmail(localStorage.getItem('user_email'));
+      const rawEntity = localStorage.getItem('selected_entity');
+      if (rawEntity) {
+        try {
+          setPickedEntity(JSON.parse(rawEntity));
+        } catch {
+          setPickedEntity({ id: rawEntity, name: rawEntity });
+        }
+      }
     }
   }, [pathname]);
 
@@ -87,6 +98,7 @@ export default function CarbonShell({ children }: CarbonShellProps) {
       localStorage.removeItem('user_email');
       localStorage.removeItem('user_entity_id');
       localStorage.removeItem('user_tenant_id');
+      localStorage.removeItem('selected_entity');
       document.cookie = 'auth_token=; path=/; max-age=0';
       document.cookie = 'auth_role=; path=/; max-age=0';
       window.location.href = '/login';
@@ -107,12 +119,19 @@ export default function CarbonShell({ children }: CarbonShellProps) {
     }
   }, [currentTheme]);
 
+  const roleUpper = userRole?.toUpperCase() || null;
+  const isAdmin = roleUpper === 'ADMIN';
+  const isAnalyst = roleUpper === 'ANALYST';
+  const isProvider = roleUpper === 'PROVIDER';
+  const isSubject = roleUpper === 'SUBJECT';
+  const isGuest = !roleUpper;
+
   return (
     <Theme theme={currentTheme}>
       <HeaderContainer
         render={({ isSideNavExpanded, onClickSideNavExpand }: any) => (
           <>
-            <Header aria-label="IBM Credit Reporting Mechanism">
+            <Header aria-label="Credit Reporting Mechanism">
               <SkipToContent />
               <HeaderMenuButton
                 aria-label={isSideNavExpanded ? 'Close menu' : 'Open menu'}
@@ -120,23 +139,36 @@ export default function CarbonShell({ children }: CarbonShellProps) {
                 isActive={isSideNavExpanded}
                 aria-expanded={isSideNavExpanded}
               />
-              <HeaderName href="/" prefix="IBM">
-                Credit Reporting Mechanism &middot; <span className="font-mono text-xs text-[#8d8d8d] font-normal">v2.4-enterprise</span>
+              <HeaderName href="/" prefix="">
+                Credit Reporting Mechanism &middot; <span className="font-mono text-xs text-[#8d8d8d] font-normal">{gitSha}</span>
               </HeaderName>
 
               <HeaderNavigation aria-label="Primary Navigation">
-                <HeaderMenuItem href="/subject/IND-8842-1994" isActive={pathname?.includes('/subject')}>
-                  Consumer Report
-                </HeaderMenuItem>
-                <HeaderMenuItem href="/subject" isActive={pathname === '/subject'}>
-                  Commercial Entity
-                </HeaderMenuItem>
-                <HeaderMenuItem href="/provider" isActive={pathname?.includes('/provider')}>
-                  Provider Ingestion
-                </HeaderMenuItem>
-                <HeaderMenuItem href="/admin" isActive={pathname?.includes('/admin')}>
-                  Analyst & Disputes
-                </HeaderMenuItem>
+                {(isAdmin || isAnalyst || isSubject || isGuest) && (
+                  <>
+                    <HeaderMenuItem href={pickedEntity ? `/subject/${encodeURIComponent(pickedEntity.id)}` : '/subject'} isActive={pathname?.startsWith('/subject') && pathname !== '/subject'}>
+                      Consumer report
+                    </HeaderMenuItem>
+                    <HeaderMenuItem href="/subject" isActive={pathname === '/subject'}>
+                      Commercial report
+                    </HeaderMenuItem>
+                  </>
+                )}
+                {(isAdmin || isProvider || isGuest) && (
+                  <HeaderMenuItem href="/provider" isActive={pathname?.startsWith('/provider')}>
+                    Data ingestion
+                  </HeaderMenuItem>
+                )}
+                {(isAdmin || isAnalyst || isGuest) && (
+                  <HeaderMenuItem href="/analyst" isActive={pathname?.startsWith('/analyst')}>
+                    Analyst
+                  </HeaderMenuItem>
+                )}
+                {(isAdmin || isGuest) && (
+                  <HeaderMenuItem href="/admin" isActive={pathname?.startsWith('/admin')}>
+                    Governance
+                  </HeaderMenuItem>
+                )}
               </HeaderNavigation>
               
               <HeaderGlobalBar>
@@ -184,26 +216,49 @@ export default function CarbonShell({ children }: CarbonShellProps) {
                 href="#main-content"
               >
                 <SideNavItems>
-                  <SideNavMenu title="Credit Subjects" defaultExpanded={pathname?.includes('/subject') || pathname === '/'}>
-                    <SideNavMenuItem href="/subject/IND-8842-1994" isActive={pathname === '/subject/IND-8842-1994'}>
-                      Individual (Jonathan Vance)
-                    </SideNavMenuItem>
-                    <SideNavMenuItem href="/subject" isActive={pathname === '/subject'}>
-                      Commercial (Apex Holdings)
-                    </SideNavMenuItem>
-                  </SideNavMenu>
-                  
-                  <SideNavMenu title="Data Providers" defaultExpanded={pathname?.includes('/provider')}>
-                    <SideNavMenuItem href="/provider" isActive={pathname === '/provider'}>
-                      Bulk Ingestion (NAB-001)
-                    </SideNavMenuItem>
-                  </SideNavMenu>
+                  {/* Admin Nav Grouping */}
+                  {(isAdmin || isGuest) && (
+                    <SideNavMenu title="Admin" defaultExpanded={pathname?.startsWith('/admin')}>
+                      <SideNavMenuItem href="/admin" isActive={pathname === '/admin'}>
+                        Governance
+                      </SideNavMenuItem>
+                    </SideNavMenu>
+                  )}
 
-                  <SideNavMenu title="Analyst & Auditing" defaultExpanded={pathname?.includes('/admin')}>
-                    <SideNavMenuItem href="/admin" isActive={pathname === '/admin'}>
-                      Platform Governance
-                    </SideNavMenuItem>
-                  </SideNavMenu>
+                  {/* Analyst Nav Grouping */}
+                  {(isAdmin || isAnalyst || isGuest) && (
+                    <SideNavMenu title="Analyst" defaultExpanded={pathname?.startsWith('/analyst')}>
+                      <SideNavMenuItem href="/analyst" isActive={pathname === '/analyst'}>
+                        Analyst workspace
+                      </SideNavMenuItem>
+                    </SideNavMenu>
+                  )}
+
+                  {/* Provider Nav Grouping */}
+                  {(isAdmin || isProvider || isGuest) && (
+                    <SideNavMenu title="Provider" defaultExpanded={pathname?.startsWith('/provider')}>
+                      <SideNavMenuItem href="/provider" isActive={pathname === '/provider'}>
+                        Data ingestion
+                      </SideNavMenuItem>
+                    </SideNavMenu>
+                  )}
+
+                  {/* Subject Nav Grouping */}
+                  {(isAdmin || isAnalyst || isSubject || isGuest) && (
+                    <SideNavMenu title="Subject" defaultExpanded={pathname?.startsWith('/subject') || pathname === '/'}>
+                      <SideNavMenuItem href={pickedEntity ? `/subject/${encodeURIComponent(pickedEntity.id)}` : '/subject'} isActive={pathname?.startsWith('/subject') && pathname !== '/subject'}>
+                        Consumer report
+                      </SideNavMenuItem>
+                      <SideNavMenuItem href="/subject" isActive={pathname === '/subject'}>
+                        Commercial report
+                      </SideNavMenuItem>
+                      {pickedEntity && (
+                        <SideNavMenuItem href={`/subject/${encodeURIComponent(pickedEntity.id)}`} isActive={pathname === `/subject/${pickedEntity.id}`}>
+                          {pickedEntity.name} ({pickedEntity.id})
+                        </SideNavMenuItem>
+                      )}
+                    </SideNavMenu>
+                  )}
                 </SideNavItems>
               </SideNav>
             </Header>

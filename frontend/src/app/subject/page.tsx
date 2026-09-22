@@ -49,6 +49,7 @@ import {
   Time,
   Renew
 } from '@carbon/icons-react';
+import { API_BASE } from '@/lib/api';
 
 /**
  * Inner commercial credit file investigation and PAYDEX visualization component.
@@ -69,7 +70,7 @@ function CommercialSubjectContent() {
 
   // Fetch available companies for directory switcher
   useEffect(() => {
-    fetch('http://localhost:8000/api/entities?type=COMPANY&limit=10')
+    fetch(`${API_BASE}/api/entities?type=COMPANY&limit=10`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && data.entities) {
@@ -87,7 +88,7 @@ function CommercialSubjectContent() {
     setIsLoadingApi(true);
     setReportError(null);
     setIsForbidden(false);
-    fetch(`http://localhost:8000/api/reports/${encodeURIComponent(selectedEntityId)}`)
+    fetch(`${API_BASE}/api/reports/${encodeURIComponent(selectedEntityId)}`)
       .then(async (res) => {
         if (res.status === 403) {
           setIsForbidden(true);
@@ -99,7 +100,13 @@ function CommercialSubjectContent() {
         return res.json();
       })
       .then(data => {
-        if (data) setLiveReport(data);
+        if (data) {
+          setLiveReport(data);
+          if (typeof window !== 'undefined') {
+            const compName = data.entity?.basic_info?.company_name || selectedEntityId;
+            localStorage.setItem('selected_entity', JSON.stringify({ id: selectedEntityId, name: compName }));
+          }
+        }
       })
       .catch((err) => {
         setReportError(err.message || 'Error fetching commercial credit report');
@@ -703,7 +710,7 @@ function CommercialSubjectContent() {
                 Immutable cryptographic ledger events recording trade payments, director updates, and registry pulls.
               </p>
               <div className="border border-[var(--cds-border-subtle)] p-4 font-mono text-xs text-[var(--cds-text-secondary)] space-y-2">
-                <div>[2026-09-21 08:30:00 UTC] AS_OF_PULL: Subscriber NAB-001 pulled commercial credit assessment.</div>
+                <div>[2026-09-21 08:30:00 UTC] AS_OF_PULL: Subscriber PRV-001 pulled commercial credit assessment.</div>
                 <div>[2026-08-01 10:15:22 UTC] LEDGER_COMMIT: Trade credit line TRADE-SUP-901 ingested ($42,300 balance).</div>
                 <div>[2026-04-12 14:02:11 UTC] PPSR_REGISTRATION: CBA General Security Agreement lodged and verified.</div>
                 <div>[2024-05-18 09:00:00 UTC] ASIC_SYNC: Registered directorships confirmed via ASIC corporate gateway.</div>

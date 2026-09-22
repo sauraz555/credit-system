@@ -31,6 +31,31 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Optional site lockdown via Basic Auth if SITE_PASSWORD is set
+  const sitePassword = process.env.SITE_PASSWORD;
+  if (sitePassword && !pathname.startsWith('/_next') && pathname !== '/favicon.ico') {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Basic ')) {
+      return new NextResponse('Authentication Required', {
+        status: 401,
+        headers: { 'WWW-Authenticate': 'Basic realm="Credit Reporting Mechanism Secure Gateway"' }
+      });
+    }
+    try {
+      const base64Credentials = authHeader.split(' ')[1];
+      const credentials = atob(base64Credentials);
+      const [, pass] = credentials.split(':');
+      if (pass !== sitePassword) {
+        return new NextResponse('Invalid Credentials', {
+          status: 401,
+          headers: { 'WWW-Authenticate': 'Basic realm="Credit Reporting Mechanism Secure Gateway"' }
+        });
+      }
+    } catch {
+      return new NextResponse('Invalid Authorization Header', { status: 400 });
+    }
+  }
+
   // Bypass public or static routes
   if (
     pathname.startsWith('/login') ||

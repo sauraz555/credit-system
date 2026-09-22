@@ -40,11 +40,14 @@ import {
   CheckmarkOutline,
   Warning,
   Error as ErrorIcon,
-  DocumentAdd,
-  Renew,
   Play,
-  Catalog
+  Catalog,
+  DocumentView,
+  Time,
+  Renew,
+  Locked
 } from '@carbon/icons-react';
+import { API_BASE } from '@/lib/api';
 
 /**
  * Credit Provider Console component for ledger event submissions and bureau enquiries.
@@ -52,10 +55,18 @@ import {
  * @returns JSX.Element rendering JSON payload editor, batch file uploader, and enquiry console.
  */
 export default function ProviderDashboard() {
+  const [userEntityId, setUserEntityId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setUserEntityId(localStorage.getItem('user_entity_id'));
+    }
+  }, []);
+
   // Ingestion State
   const [templateType, setTemplateType] = useState('DEFAULT');
   const [jsonPayload, setJsonPayload] = useState(JSON.stringify({
-    "provider_id": "PRV-NAB-001",
+    "provider_id": "PRV-001",
     "provider_license": "ACL-230692",
     "entity_id": "IND-8842-1994",
     "record_type": "DEFAULT",
@@ -81,6 +92,8 @@ export default function ProviderDashboard() {
   const [inquiryAmount, setInquiryAmount] = useState('650000');
   const [isInquiring, setIsInquiring] = useState(false);
   const [inquiryResult, setInquiryResult] = useState<any>(null);
+
+  // Live Audit Events State
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(true);
   const [auditError, setAuditError] = useState<string | null>(null);
@@ -92,7 +105,7 @@ export default function ProviderDashboard() {
     setAuditError(null);
     setIsForbiddenAudit(false);
     try {
-      const res = await fetch('http://localhost:8000/api/ingest/events');
+      const res = await fetch(`${API_BASE}/api/ingest/events`);
       if (res.status === 403) {
         setIsForbiddenAudit(true);
         throw new Error('403 Forbidden: Insufficient provider permissions to view ingestion audit events.');
@@ -180,7 +193,7 @@ export default function ProviderDashboard() {
         valid_from: parsed.valid_time ? parsed.valid_time.slice(0, 10) : new Date().toISOString().slice(0, 10)
       };
 
-      const res = await fetch('http://localhost:8000/api/ingest/record', {
+      const res = await fetch(`${API_BASE}/api/ingest/record`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -220,7 +233,7 @@ export default function ProviderDashboard() {
     e.preventDefault();
     setIsInquiring(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/reports/${encodeURIComponent(inquirySubject.trim())}`);
+      const res = await fetch(`${API_BASE}/api/reports/${encodeURIComponent(inquirySubject.trim())}`);
       if (!res.ok) throw new Error("Entity record not found");
       const data = await res.json();
       const b = data.entity?.basic_info || {};
@@ -239,9 +252,10 @@ export default function ProviderDashboard() {
         inquiryLoggedAs: `HARD INQUIRY #INQ-2026-${Date.now().toString().slice(-5)}`
       });
     } catch {
+      // Fallback preview
       setInquiryResult({
         fileId: inquirySubject,
-        name: 'Jonathan Edward Vance',
+        name: inquirySubject === 'IND-8842-1994' ? 'Consumer File (IND-8842-1994)' : `Subject ${inquirySubject}`,
         score: 712,
         band: 'Good (Prime Tier 2)',
         activeDefaults: 1,
@@ -264,7 +278,7 @@ export default function ProviderDashboard() {
             <Link href="/" className="text-[var(--cds-link-primary)] hover:underline">CRMS Root</Link>
           </BreadcrumbItem>
           <BreadcrumbItem isCurrentPage className="font-mono text-white">
-            Provider Gateway (NAB-001)
+            Credit Provider Gateway
           </BreadcrumbItem>
         </Breadcrumb>
 
@@ -280,9 +294,9 @@ export default function ProviderDashboard() {
           <div>
             <div className="flex items-center gap-3 mb-1.5">
               <h1 className="text-2xl md:text-3xl font-light text-white tracking-tight">
-                National Australia Bank &bull; Credit Provider Console
+                Credit Provider Ingestion Console
               </h1>
-              <Tag type="purple" size="sm" className="font-mono m-0">PRV-NAB-001</Tag>
+              <Tag type="purple" size="sm" className="font-mono m-0">{userEntityId || 'PRV-PARTICIPANT'}</Tag>
             </div>
             <p className="text-xs text-[var(--cds-text-secondary)]">
               Authorized endpoint for comprehensive credit data exchange under the Privacy (Credit Reporting) Code 2014 (CR Code).
@@ -292,7 +306,7 @@ export default function ProviderDashboard() {
           <div className="flex items-center gap-4 text-xs font-mono bg-[var(--cds-layer-02)] px-4 py-3 border border-[var(--cds-border-subtle)]">
             <div>
               <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Active API Key</div>
-              <div className="text-white">crms_live_prv_nab_9982</div>
+              <div className="text-white">crms_live_prv_gateway</div>
             </div>
             <div className="border-l border-[var(--cds-border-subtle)] pl-4">
               <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Monthly Ingestion Quota</div>

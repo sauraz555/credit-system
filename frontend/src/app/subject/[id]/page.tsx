@@ -50,6 +50,7 @@ import {
   Undo
 } from '@carbon/icons-react';
 import Link from 'next/link';
+import { API_BASE } from '@/lib/api';
 
 /**
  * Consumer Credit Report component for individual credit file inspection and dispute initiation.
@@ -74,7 +75,7 @@ export default function CreditReportPage() {
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    fetch(`http://localhost:8000/api/reports/${encodeURIComponent(routeId)}`, { headers })
+    fetch(`${API_BASE}/api/reports/${encodeURIComponent(routeId)}`, { headers })
       .then(async (res) => {
         if (res.status === 403) {
           setIsForbidden(true);
@@ -86,7 +87,14 @@ export default function CreditReportPage() {
         return res.json();
       })
       .then(data => {
-        if (data) setLiveReport(data);
+        if (data) {
+          setLiveReport(data);
+          if (typeof window !== 'undefined') {
+            const b = data.entity?.basic_info || {};
+            const subjectName = b.company_name || `${b.first_name || ''} ${b.last_name || ''}`.trim() || routeId;
+            localStorage.setItem('selected_entity', JSON.stringify({ id: routeId, name: subjectName }));
+          }
+        }
       })
       .catch((err) => {
         console.error("Error fetching credit report", err);
@@ -160,7 +168,7 @@ export default function CreditReportPage() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const url = `http://localhost:8000/api/reports/${encodeURIComponent(routeId)}${dateKey !== 'CURRENT' ? `?as_of=${dateKey}` : ''}`;
+      const url = `${API_BASE}/api/reports/${encodeURIComponent(routeId)}${dateKey !== 'CURRENT' ? `?as_of=${dateKey}` : ''}`;
       const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
@@ -274,7 +282,7 @@ export default function CreditReportPage() {
   const handleDisputeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8000/api/disputes', {
+      const res = await fetch(`${API_BASE}/api/disputes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

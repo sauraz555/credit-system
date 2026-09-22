@@ -45,13 +45,16 @@ import {
   Play,
   Catalog
 } from '@carbon/icons-react';
+import { API_BASE } from '@/lib/api';
 
 /**
  * Enterprise Administration and Model Calibration Dashboard component.
  *
- * @returns JSX.Element rendering model weights tuner, backtest results, dispute queue, and director graphs.
+ * @returns JSX.Element rendering system model versioning, dispute adjudication, and network graphs.
  */
-export default function AdminAnalystDashboard() {
+export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState(0);
+
   // Model weights state
   const [activeModel, setActiveModel] = useState<'v1' | 'v2'>('v1');
   const [weightRhi, setWeightRhi] = useState(35);
@@ -63,13 +66,13 @@ export default function AdminAnalystDashboard() {
   const [deploySuccess, setDeploySuccess] = useState(false);
   const [backtestStats, setBacktestStats] = useState<any>(null);
 
-  // Dispute actions state (no mock fallback data)
+  // Live Disputes State
   const [disputes, setDisputes] = useState<any[]>([]);
   const [isLoadingDisputes, setIsLoadingDisputes] = useState(true);
   const [disputeError, setDisputeError] = useState<string | null>(null);
   const [isForbiddenDisputes, setIsForbiddenDisputes] = useState(false);
 
-  // Network topology state
+  // Network Contagion Graph State
   const [networkData, setNetworkData] = useState<any>(null);
   const [isLoadingNetwork, setIsLoadingNetwork] = useState(true);
   const [networkError, setNetworkError] = useState<string | null>(null);
@@ -80,7 +83,7 @@ export default function AdminAnalystDashboard() {
     setDisputeError(null);
     setIsForbiddenDisputes(false);
     try {
-      const res = await fetch('http://localhost:8000/api/disputes');
+      const res = await fetch(`${API_BASE}/api/disputes`);
       if (res.status === 403) {
         setIsForbiddenDisputes(true);
         throw new Error('403 Forbidden: Insufficient administrative privileges to view dispute registry.');
@@ -114,7 +117,7 @@ export default function AdminAnalystDashboard() {
     fetchDisputes();
     setIsLoadingNetwork(true);
     setNetworkError(null);
-    fetch('http://localhost:8000/api/admin/network?limit_companies=8')
+    fetch(`${API_BASE}/api/admin/network?limit_companies=8`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -131,7 +134,7 @@ export default function AdminAnalystDashboard() {
   const handleResolveDispute = async (dispId: string, action: 'EXPUNGE' | 'CONFIRM') => {
     const newStatus = action === 'EXPUNGE' ? 'RESOLVED_EXPUNGED' : 'CONFIRMED_ACCURATE';
     try {
-      await fetch(`http://localhost:8000/api/disputes/${dispId}`, {
+      await fetch(`${API_BASE}/api/disputes/${dispId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,7 +162,7 @@ export default function AdminAnalystDashboard() {
   const handleDeployModel = async () => {
     setIsDeploying(true);
     try {
-      const res = await fetch('http://localhost:8000/api/admin/backtest?model_id=v2', { method: 'POST' });
+      const res = await fetch(`${API_BASE}/api/admin/backtest?model_id=v2`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         setBacktestStats(data);

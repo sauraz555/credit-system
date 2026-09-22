@@ -29,8 +29,7 @@ import {
   Tag
 } from '@carbon/react';
 import { Login, Locked, UserAvatar, ArrowRight, Reset, Information, Security } from '@carbon/icons-react';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE, checkBackendHealth } from '@/lib/api';
 
 /**
  * Inner login form component managing interactive credential inputs, TOTP challenges, and session cookies.
@@ -52,6 +51,15 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [backendOffline, setBackendOffline] = useState(false);
+
+  useEffect(() => {
+    checkBackendHealth().then((isOnline) => {
+      if (!isOnline) {
+        setBackendOffline(true);
+      }
+    });
+  }, []);
 
   const setAuthCookies = (token: string, role: string) => {
     // 7 days expiration
@@ -90,8 +98,9 @@ function LoginForm() {
       // No MFA required (e.g. SUBJECT role)
       completeAuthentication(data);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Login failed. Verify credentials and backend status.');
       setIsLoading(false);
+      setBackendOffline(true);
+      setErrorMsg(err.message || 'Login failed. Verify credentials and backend status.');
     }
   };
 
@@ -180,6 +189,17 @@ function LoginForm() {
                 : 'Authenticate with your credentialed enterprise role to access partitioned regulatory portals.'}
             </p>
           </div>
+
+          {backendOffline && (
+            <InlineNotification
+              kind="warning"
+              title="Demo backend not connected. Set NEXT_PUBLIC_API_URL."
+              subtitle={`The frontend is attempting to communicate with ${API_BASE}. To connect a live backend, deploy the FastAPI service and set the NEXT_PUBLIC_API_URL environment variable.`}
+              lowContrast
+              hideCloseButton
+              style={{ marginBottom: '1.5rem' }}
+            />
+          )}
 
           {errorMsg && (
             <InlineNotification

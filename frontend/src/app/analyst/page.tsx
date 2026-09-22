@@ -59,6 +59,7 @@ import {
   DocumentView,
   Analytics
 } from '@carbon/icons-react';
+import { API_BASE } from '@/lib/api';
 
 /**
  * Bureau Analyst Workspace component for dispute investigations, bitemporal lookups, and model backtesting.
@@ -66,31 +67,29 @@ import {
  * @returns JSX.Element rendering dispute queues, bitemporal investigator, and backtesting uploaders.
  */
 export default function AnalystWorkspace() {
-  // Navigation / Tab state
   const [selectedTab, setSelectedTab] = useState(0);
 
-  // 1. Dispute Queue state
+  // 1. Statutory Dispute Management State
   const [disputes, setDisputes] = useState<any[]>([]);
   const [loadingDisputes, setLoadingDisputes] = useState(true);
   const [disputeError, setDisputeError] = useState<string | null>(null);
 
-  // 2. File Investigation state
-  const [entityIdInput, setEntityIdInput] = useState('IND-8842-1994');
-  const [asOfDateInput, setAsOfDateInput] = useState('2024-06-01');
+  // 2. Bitemporal Historical File Investigation State
+  const [entityIdInput, setEntityIdInput] = useState('');
+  const [asOfDateInput, setAsOfDateInput] = useState('');
   const [investigationData, setInvestigationData] = useState<any>(null);
   const [loadingInvestigation, setLoadingInvestigation] = useState(false);
   const [investigationError, setInvestigationError] = useState<string | null>(null);
 
-  // 3. Back-Testing state
+  // 3. Model Back-Testing State
   const [models, setModels] = useState<any[]>([]);
-  const [selectedModelId, setSelectedModelId] = useState<string>('');
+  const [selectedModelId, setSelectedModelId] = useState('');
   const [obsDate, setObsDate] = useState('2024-06-01');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [runningBacktest, setRunningBacktest] = useState(false);
   const [backtestResults, setBacktestResults] = useState<any>(null);
   const [backtestError, setBacktestError] = useState<string | null>(null);
 
-  // Fetch initial disputes and models
   useEffect(() => {
     fetchDisputes();
     fetchModels();
@@ -100,7 +99,7 @@ export default function AnalystWorkspace() {
     setLoadingDisputes(true);
     setDisputeError(null);
     try {
-      const res = await fetch('http://localhost:8000/api/disputes');
+      const res = await fetch(`${API_BASE}/api/disputes`);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: Failed to load dispute queue`);
       }
@@ -115,7 +114,7 @@ export default function AnalystWorkspace() {
 
   const fetchModels = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/models');
+      const res = await fetch(`${API_BASE}/api/admin/models`);
       if (res.ok) {
         const data = await res.json();
         setModels(data);
@@ -123,7 +122,7 @@ export default function AnalystWorkspace() {
           setSelectedModelId(data[0].id);
         }
       }
-    } catch (err) {
+    } catch {
       // Handled gracefully in UI
     }
   };
@@ -134,7 +133,7 @@ export default function AnalystWorkspace() {
     setInvestigationError(null);
     setInvestigationData(null);
     try {
-      const url = `http://localhost:8000/api/reports/${encodeURIComponent(entityIdInput.trim())}${
+      const url = `${API_BASE}/api/reports/${encodeURIComponent(entityIdInput.trim())}${
         asOfDateInput ? `?as_of=${encodeURIComponent(asOfDateInput)}` : ''
       }`;
       const res = await fetch(url);
@@ -166,12 +165,12 @@ export default function AnalystWorkspace() {
       if (uploadedFile) {
         const formData = new FormData();
         formData.append('file', uploadedFile);
-        res = await fetch(`http://localhost:8000/api/admin/backtest?${queryParams.toString()}`, {
+        res = await fetch(`${API_BASE}/api/admin/backtest?${queryParams.toString()}`, {
           method: 'POST',
           body: formData
         });
       } else {
-        res = await fetch(`http://localhost:8000/api/admin/backtest?${queryParams.toString()}`, {
+        res = await fetch(`${API_BASE}/api/admin/backtest?${queryParams.toString()}`, {
           method: 'POST'
         });
       }

@@ -40,8 +40,10 @@ import {
   Time,
   Catalog,
   DataShare,
-  Warning
+  Warning,
+  Analytics
 } from '@carbon/icons-react';
+import { API_BASE } from '@/lib/api';
 
 /**
  * Root Landing Dashboard component providing system metrics, search, and navigation.
@@ -66,7 +68,7 @@ export default function Home() {
 
   // Fetch live bureau stats on mount
   useEffect(() => {
-    fetch('http://localhost:8000/api/entities/stats')
+    fetch(`${API_BASE}/api/entities/stats`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) setStats(data);
@@ -84,7 +86,7 @@ export default function Home() {
     }
     const timer = setTimeout(() => {
       setIsSearching(true);
-      fetch(`http://localhost:8000/api/entities?search=${encodeURIComponent(searchQuery.trim())}&limit=5`)
+      fetch(`${API_BASE}/api/entities?search=${encodeURIComponent(searchQuery.trim())}&limit=5`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && data.entities) {
@@ -188,7 +190,12 @@ export default function Home() {
                       key={ent.id}
                       href={targetHref}
                       className="flex items-center justify-between p-2.5 hover:bg-[#0f62fe]/20 text-xs transition-colors"
-                      onClick={() => setSearchResults([])}
+                      onClick={() => {
+                        setSearchResults([]);
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('selected_entity', JSON.stringify({ id: ent.identifier || ent.id, name: label }));
+                        }
+                      }}
                     >
                       <div>
                         <div className="text-white font-medium">{label}</div>
@@ -264,22 +271,22 @@ export default function Home() {
         Bureau Operational Workspaces
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
         {/* Module 1: Consumer CCR Reporting */}
         <Link href="/subject/IND-8842-1994" className="block group">
           <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <Tag type="cyan" size="sm" className="m-0 font-mono">COMMERCIAL</Tag>
+                <Tag type="cyan" size="sm" className="m-0 font-mono">CONSUMER CCR</Tag>
                 <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
               </div>
-              <h2 className="text-lg font-medium text-white mb-2">Commercial Credit Assessment</h2>
+              <h3 className="text-lg font-medium text-white mb-2">Consumer Assessment</h3>
               <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
                 Inspect comprehensive consumer files, 24-month RHI calendars, adverse default records, and interactive what-if score simulations.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
-              <span>View Jonathan Vance (IND-8842)</span>
+              <span>Access Consumer Report</span>
               <span className="font-mono">712 PTS</span>
             </div>
           </div>
@@ -299,7 +306,7 @@ export default function Home() {
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
-              <span>View Apex Holdings (ACN-109)</span>
+              <span>Access Commercial Report</span>
               <span className="font-mono">PAYDEX 78</span>
             </div>
           </div>
@@ -313,19 +320,39 @@ export default function Home() {
                 <Tag type="purple" size="sm" className="m-0 font-mono">API & INGEST</Tag>
                 <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
               </div>
-              <h2 className="text-lg font-medium text-white mb-2">Provider Ingestion Console</h2>
+              <h3 className="text-lg font-medium text-white mb-2">Provider Ingestion Console</h3>
               <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
                 Credit provider gateway for batch CSV and real-time JSON submission with statutory validation (debt &ge;$150, 60+ days, notice given).
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
-              <span>National Australia Bank (NAB-001)</span>
+              <span>Data Ingestion Gateway</span>
               <span className="font-mono text-[#42be65]">ACTIVE</span>
             </div>
           </div>
         </Link>
 
-        {/* Module 4: Admin, Analyst & Disputes */}
+        {/* Module 4: Analyst Workspace */}
+        <Link href="/analyst" className="block group">
+          <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <Tag type="blue" size="sm" className="m-0 font-mono">SUPERVISORY</Tag>
+                <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+              </div>
+              <h3 className="text-lg font-medium text-white mb-2">Analyst Workspace</h3>
+              <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
+                Statutory s20V dispute review, bitemporal point-in-time file reconstruction, and credit risk statistical model back-testing.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
+              <span>Launch Analyst Console</span>
+              <span className="font-mono text-[#0f62fe]">INVESTIGATE</span>
+            </div>
+          </div>
+        </Link>
+
+        {/* Module 5: Governance & Auditing */}
         <Link href="/admin" className="block group">
           <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors">
             <div>
@@ -333,13 +360,13 @@ export default function Home() {
                 <Tag type="magenta" size="sm" className="m-0 font-mono">REGULATION</Tag>
                 <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
               </div>
-              <h2 className="text-lg font-medium text-white mb-2">Analyst & Dispute Console</h2>
+              <h3 className="text-lg font-medium text-white mb-2">Platform Governance</h3>
               <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
-                Supervisory tools for dynamic model weights versioning (v1.0 vs v2.0), Director Network contagion graphs, and statutory dispute resolution.
+                Supervisory tools for dynamic model weights versioning, Director Network contagion graphs, and statutory dispute resolution.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
-              <span>Section 20V Dispute Queue</span>
+              <span>Governance & Auditing</span>
               <span className="font-mono text-[#f1c21b]">{stats.open_disputes_count} PENDING</span>
             </div>
           </div>
