@@ -116,6 +116,6 @@ export const config = {
     '/analyst/:path*',
     '/provider/:path*',
     '/subject/:path*',
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.\\w+$).*)',
   ],
 };
