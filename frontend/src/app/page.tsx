@@ -1,19 +1,18 @@
 /**
- * Credit Bureau Intelligence Platform Landing Page Dashboard.
+ * National Credit Registry & Intelligence Platform Landing Dashboard.
  *
  * Serves as the primary operational entry point for the Credit Reporting Mechanism (CRMS),
  * displaying platform health telemetry, high-level portfolio metrics, live bitemporal
  * audit ledger event streams, and direct file lookup capabilities across individual and
- * commercial corporate registers.
+ * commercial corporate registers under the Nepal regulatory framework.
  *
  * Architecture:
  *   Frontend Presentation Layer (Root Dashboard Route).
- *   Next.js client-side component ('use client') utilizing Carbon Design System components.
- *   Queries backend stats (`/api/entities/stats`) and autocomplete (`/api/entities?search=`).
+ *   Integrated with next-intl reactive localization (en / ne) and Carbon Design System components.
  *
  * Legal / Regulatory:
- *   Privacy Act 1988 Part IIIA (Cth), Privacy (Credit Reporting) Code 2014, and National
- *   Consumer Credit Protection Act 2009 (NCCPA).
+ *   Nepal Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५) and
+ *   Nepal Rastra Bank (NRB) Credit Information Directives.
  */
 
 "use client";
@@ -21,48 +20,28 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Tile,
-  ClickableTile,
-  Tag,
-  Button,
-  TextInput,
-  InlineNotification
-} from '@carbon/react';
-import {
-  UserAvatar,
-  Enterprise,
-  Upload,
-  SettingsAdjust,
-  Search,
-  ArrowRight,
-  CheckmarkOutline,
-  Time,
-  Catalog,
-  DataShare,
-  Warning,
-  Analytics
-} from '@carbon/icons-react';
+import { Tag, Button } from '@carbon/react';
+import { ArrowRight, Time, Search } from '@carbon/icons-react';
 import { API_BASE } from '@/lib/api';
+import { useLocaleContext, useTranslations } from '@/lib/i18n';
+import { formatNumber, formatDualDate } from '@/lib/nepaliDate';
 
-/**
- * Root Landing Dashboard component providing system metrics, search, and navigation.
- *
- * @returns JSX.Element rendering system status, search bar, metrics tiles, and module cards.
- */
 export default function Home() {
   const router = useRouter();
+  const { locale } = useLocaleContext();
+  const { t } = useTranslations('home');
+  const { t: tNav } = useTranslations('nav');
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  // REVIEW-ASSUMPTION: Default mock statistics fallback in case backend telemetry endpoint is unreachable
   const [stats, setStats] = useState({
     individuals_count: 508,
     companies_count: 100,
     total_entities: 608,
     ledger_events_count: 547,
     open_disputes_count: 5,
-    reporting_window: "SEPTEMBER 2026 CYCLE OPEN",
+    reporting_window: "2026/2083 CYCLE OPEN",
     hash_consistency: "100.0%"
   });
 
@@ -107,7 +86,7 @@ export default function Home() {
     const q = searchQuery.trim();
     if (!q) return;
 
-    if (q.toUpperCase().startsWith('ACN') || q.toUpperCase().startsWith('ABN')) {
+    if (q.toUpperCase().startsWith('PAN') || q.toUpperCase().startsWith('VAT') || q.toUpperCase().startsWith('OCR')) {
       router.push(`/subject?id=${encodeURIComponent(q)}`);
     } else {
       router.push(`/subject/${encodeURIComponent(q)}`);
@@ -119,33 +98,33 @@ export default function Home() {
       {/* Page Header */}
       <div>
         <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
-          Credit Bureau Intelligence Platform
+          {t('title', 'National Credit Registry & Scoring Mechanism')}
         </h1>
         <p className="text-xs text-[#999999] mt-1">
-          Comprehensive Credit Reporting (CCR) system operating under Part IIIA of the Privacy Act 1988 (Cth).
+          {t('subtitle', 'Centralised credit reporting infrastructure under the Nepal Individual Privacy Act 2018 and Nepal Rastra Bank Directives.')}
         </p>
       </div>
 
       {/* Direct File Lookup */}
       <div className="bg-[#141417] border border-[#202026] p-4 rounded-[2px]">
         <div className="text-xs font-semibold text-[#999999] uppercase tracking-wider mb-2">
-          Direct File Lookup
+          {t('searchBtn', 'Search Directory')}
         </div>
         <form onSubmit={handleOpenSearch} className="flex gap-2 relative">
           <label htmlFor="direct-file-lookup-input" className="sr-only">
-            Direct File Lookup
+            {t('searchPlaceholder', 'Search by Citizenship No (नागरिकता नं.), National ID (NID), or PAN...')}
           </label>
           <input
             id="direct-file-lookup-input"
-            aria-label="Search File ID, ABN, ACN, or Name"
+            aria-label={t('searchPlaceholder', 'Search by Citizenship No (नागरिकता नं.), National ID (NID), or PAN...')}
             type="text"
-            placeholder="Search File ID, ABN, ACN, or Name..."
+            placeholder={t('searchPlaceholder', 'Search by Citizenship No (नागरिकता नं.), National ID (NID), or PAN...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 bg-[#0b0b0d] text-[#e6e6e6] text-xs px-3 py-2 border border-[#202026] focus:border-[#0f62fe] focus:outline-none rounded-[2px]"
           />
           <Button size="sm" kind="primary" renderIcon={ArrowRight} type="submit">
-            Open
+            {t('viewReport', 'Inspect File')}
           </Button>
 
           {/* Live autocomplete dropdown */}
@@ -178,7 +157,7 @@ export default function Home() {
                       </div>
                     </div>
                     <Tag size="sm" type={ent.type === 'COMPANY' ? 'teal' : 'blue'} className="m-0 font-mono">
-                      {ent.score?.value ? `${ent.score.value} PTS` : 'ACTIVE'}
+                      {ent.score?.value ? `${formatNumber(ent.score.value, locale)} PTS` : 'ACTIVE'}
                     </Tag>
                   </Link>
                 );
@@ -188,124 +167,194 @@ export default function Home() {
         </form>
       </div>
 
+      {/* Featured Benchmark Profiles */}
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#999999] mb-3">
+          {t('featuredProfiles', 'Featured Benchmark Profiles')}
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link href="/subject/CIT-27-01-78-04821" className="block group">
+            <div className="bg-[#141417] border border-[#202026] p-4 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors rounded-[2px]">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Tag type="blue" size="sm" className="m-0 font-mono">CONSUMER (कन्जुमर)</Tag>
+                  <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                </div>
+                <h3 className="text-base font-medium text-white mb-1">
+                  {t('consumerProfile', 'Consumer File: Ram Kumar Shrestha')}
+                </h3>
+                <p className="text-xs text-[#999999] leading-relaxed">
+                  {t('consumerDesc', 'Kathmandu individual file featuring NEA electricity, telecom, Nabil Bank home loan, tax compliance, and Section 12 dispute.')}
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-[#202026] text-xs text-[#0f62fe] flex items-center justify-between">
+                <span>{t('viewReport', 'Inspect File')}</span>
+                <span className="font-mono font-semibold">९६४ / 964 PTS</span>
+              </div>
+            </div>
+          </Link>
+
+          <Link href="/subject" className="block group">
+            <div className="bg-[#141417] border border-[#202026] p-4 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors rounded-[2px]">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Tag type="teal" size="sm" className="m-0 font-mono">COMMERCIAL (कमर्सियल)</Tag>
+                  <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                </div>
+                <h3 className="text-base font-medium text-white mb-1">
+                  {t('commercialProfile', 'Commercial File: Apex Engineering Pvt. Ltd.')}
+                </h3>
+                <p className="text-xs text-[#999999] leading-relaxed">
+                  {t('commercialDesc', 'Lalitpur infrastructure contractor featuring PAN/VAT compliance, OCR registration, trade payments, and director linkage.')}
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-[#202026] text-xs text-[#0f62fe] flex items-center justify-between">
+                <span>{t('viewReport', 'Inspect File')}</span>
+                <span className="font-mono font-semibold">८२ / 82 PROMPT</span>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </div>
+
       {/* Operational Workspaces */}
       <div>
         <h2 className="text-xs font-semibold uppercase tracking-wider text-[#999999] mb-3">
-          Bureau Operational Workspaces
+          {t('bureauMetrics', 'National Bureau Metrics')}
         </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
-        {/* Module 1: Consumer CCR Reporting */}
-        <Link href="/subject/IND-8842-1994" className="block group">
-          <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <Tag type="cyan" size="sm" className="m-0 font-mono">CONSUMER CCR</Tag>
-                <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          {/* Module 1: Consumer CCR Reporting */}
+          <Link href="/subject/CIT-27-01-78-04821" className="block group">
+            <div className="bg-[#141417] border border-[#202026] p-4 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors rounded-[2px]">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Tag type="cyan" size="sm" className="m-0 font-mono">{tNav('consumer', 'Consumer')}</Tag>
+                  <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                </div>
+                <h3 className="text-sm font-medium text-white mb-2">
+                  {locale === 'ne' ? '५-स्तम्भ व्यक्तिगत मूल्याङ्कन' : '5-Pillar Consumer Assessment'}
+                </h3>
+                <p className="text-xs text-[#999999] leading-relaxed">
+                  {locale === 'ne'
+                    ? 'महशुल (३५%), कालोसूची (२५%), आम्दानी (२०%), कर चुक्ता (१२%), र घरबहाल (८%) सहितको पूर्ण व्यक्तिगत विवरण।'
+                    : 'Inspect comprehensive files across utility (35%), blacklist (25%), income (20%), tax (12%), and rental (8%) pillars.'}
+                </p>
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">Consumer Assessment</h3>
-              <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
-                Inspect comprehensive consumer files, 24-month RHI calendars, adverse default records, and interactive what-if score simulations.
-              </p>
+              <div className="mt-4 pt-3 border-t border-[#202026] text-xs text-[#0f62fe] flex items-center justify-between">
+                <span>{t('viewReport', 'Inspect File')}</span>
+                <span className="font-mono">CIT-27-01</span>
+              </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
-              <span>Access Consumer Report</span>
-              <span className="font-mono">712 PTS</span>
-            </div>
-          </div>
-        </Link>
+          </Link>
 
-        {/* Module 2: Commercial Intelligence */}
-        <Link href="/subject" className="block group">
-          <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <Tag type="teal" size="sm" className="m-0 font-mono">COMMERCIAL CCR</Tag>
-                <ArrowRight size={16} className="text-gray-400 group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+          {/* Module 2: Commercial Intelligence */}
+          <Link href="/subject" className="block group">
+            <div className="bg-[#141417] border border-[#202026] p-4 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors rounded-[2px]">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Tag type="teal" size="sm" className="m-0 font-mono">{tNav('commercial', 'Commercial')}</Tag>
+                  <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                </div>
+                <h3 className="text-sm font-medium text-white mb-2">
+                  {locale === 'ne' ? 'संस्थागत साख तथा सञ्चालक सञ्जाल' : 'Corporate Standing & Director Network'}
+                </h3>
+                <p className="text-xs text-[#999999] leading-relaxed">
+                  {locale === 'ne'
+                    ? 'स्थायी लेखा नम्बर (PAN), भ्याट, कम्पनी रजिस्ट्रार दर्ता र सञ्चालक सङ्क्रमण जोखिमको एकीकृत विश्लेषण।'
+                    : 'Corporate intelligence featuring PAN, VAT, OCR company registration, trade payment promptness, and director networks.'}
+                </p>
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">Company Entity & PAYDEX</h3>
-              <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
-                Corporate risk analysis featuring PAYDEX 1-100 scores, Director Network contagion, PPSR charges, and trade credit payment trends.
-              </p>
+              <div className="mt-4 pt-3 border-t border-[#202026] text-xs text-[#0f62fe] flex items-center justify-between">
+                <span>{t('viewReport', 'Inspect File')}</span>
+                <span className="font-mono">PAN-601283</span>
+              </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
-              <span>Access Commercial Report</span>
-              <span className="font-mono">PAYDEX 78</span>
-            </div>
-          </div>
-        </Link>
+          </Link>
 
-        {/* Module 3: Provider Ingestion */}
-        <Link href="/provider" className="block group">
-          <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <Tag type="purple" size="sm" className="m-0 font-mono">API & INGEST</Tag>
-                <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+          {/* Module 3: Provider Ingestion */}
+          <Link href="/provider" className="block group">
+            <div className="bg-[#141417] border border-[#202026] p-4 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors rounded-[2px]">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Tag type="purple" size="sm" className="m-0 font-mono">{tNav('ingestion', 'Ingestion')}</Tag>
+                  <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                </div>
+                <h3 className="text-sm font-medium text-white mb-2">
+                  {locale === 'ne' ? 'क/ख/ग/घ बैंक तथा उपयोगिता प्रविष्टि' : 'BFI & Utility Ingestion Gateway'}
+                </h3>
+                <p className="text-xs text-[#999999] leading-relaxed">
+                  {locale === 'ne'
+                    ? 'नेपाल राष्ट्र बैंक नियमन बैंकहरू तथा विद्युत् (NEA), खानेपानी र दूरसञ्चार निकायहरूका लागि सुरक्षित प्रविष्टि।'
+                    : 'Gateway for licensed BFIs and public utilities (NEA, KUKL, NTC, Ncell) with cryptographic verification.'}
+                </p>
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">Provider Ingestion Console</h3>
-              <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
-                Credit provider gateway for batch CSV and real-time JSON submission with statutory validation (debt &ge;$150, 60+ days, notice given).
-              </p>
+              <div className="mt-4 pt-3 border-t border-[#202026] text-xs text-[#0f62fe] flex items-center justify-between">
+                <span>{locale === 'ne' ? 'प्रविष्टि कन्सोल' : 'Ingestion Gateway'}</span>
+                <span className="font-mono text-[#24a148]">ONLINE</span>
+              </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
-              <span>Data Ingestion Gateway</span>
-              <span className="font-mono text-[#42be65]">ACTIVE</span>
-            </div>
-          </div>
-        </Link>
+          </Link>
 
-        {/* Module 4: Analyst Workspace */}
-        <Link href="/analyst" className="block group">
-          <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <Tag type="blue" size="sm" className="m-0 font-mono">SUPERVISORY</Tag>
-                <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+          {/* Module 4: Analyst Workspace */}
+          <Link href="/analyst" className="block group">
+            <div className="bg-[#141417] border border-[#202026] p-4 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors rounded-[2px]">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Tag type="blue" size="sm" className="m-0 font-mono">{tNav('analyst', 'Analyst')}</Tag>
+                  <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                </div>
+                <h3 className="text-sm font-medium text-white mb-2">
+                  {locale === 'ne' ? 'दफा १२ उजुरी फछ्र्यौट कार्यकक्ष' : 'Section 12 Dispute Workspace'}
+                </h3>
+                <p className="text-xs text-[#999999] leading-relaxed">
+                  {locale === 'ne'
+                    ? 'वैयक्तिक गोपनीयता ऐन २०७५ को दफा १२ बमोजिम उजुरी अनुसन्धान, बाइटेम्पोरल परीक्षण तथा कानुनी किनारा।'
+                    : 'Statutory Section 12 dispute reviews, bitemporal point-in-time reconstruction, and NRB SLA tracking.'}
+                </p>
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">Analyst Workspace</h3>
-              <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
-                Statutory s20V dispute review, bitemporal point-in-time file reconstruction, and credit risk statistical model back-testing.
-              </p>
+              <div className="mt-4 pt-3 border-t border-[#202026] text-xs text-[#0f62fe] flex items-center justify-between">
+                <span>{locale === 'ne' ? 'विश्लेषक कन्सोल' : 'Launch Console'}</span>
+                <span className="font-mono text-[#0f62fe]">INVESTIGATE</span>
+              </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
-              <span>Launch Analyst Console</span>
-              <span className="font-mono text-[#0f62fe]">INVESTIGATE</span>
-            </div>
-          </div>
-        </Link>
+          </Link>
 
-        {/* Module 5: Governance & Auditing */}
-        <Link href="/admin" className="block group">
-          <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <Tag type="magenta" size="sm" className="m-0 font-mono">REGULATION</Tag>
-                <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+          {/* Module 5: Governance & Auditing */}
+          <Link href="/admin" className="block group">
+            <div className="bg-[#141417] border border-[#202026] p-4 h-full flex flex-col justify-between hover:border-[#0f62fe] transition-colors rounded-[2px]">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Tag type="magenta" size="sm" className="m-0 font-mono">{tNav('governance', 'Governance')}</Tag>
+                  <ArrowRight size={16} className="text-[#8d8d8d] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-transform" />
+                </div>
+                <h3 className="text-sm font-medium text-white mb-2">
+                  {locale === 'ne' ? 'केन्द्रीय सुशासन तथा मोडल क्यालिब्रेसन' : 'Governance & Model Calibration'}
+                </h3>
+                <p className="text-xs text-[#999999] leading-relaxed">
+                  {locale === 'ne'
+                    ? '५ आधार स्तम्भहरूको १००% भार निर्धारण, अपरिवर्तनीय अडिट लग र मोडल सक्रियता व्यवस्थापन।'
+                    : 'Calibrate statutory 5-pillar weights (sum 100%), inspect immutable bureau audit trails, and manage governance.'}
+                </p>
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">Platform Governance</h3>
-              <p className="text-xs text-[var(--cds-text-secondary)] leading-relaxed">
-                Supervisory tools for dynamic model weights versioning, Director Network contagion graphs, and statutory dispute resolution.
-              </p>
+              <div className="mt-4 pt-3 border-t border-[#202026] text-xs text-[#0f62fe] flex items-center justify-between">
+                <span>{locale === 'ne' ? 'सुशासन' : 'Governance'}</span>
+                <span className="font-mono text-[#f1c21b]">{formatNumber(stats.open_disputes_count, locale)} PENDING</span>
+              </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] text-xs text-[var(--cds-link-primary)] flex items-center justify-between">
-              <span>Governance & Auditing</span>
-              <span className="font-mono text-[#f1c21b]">{stats.open_disputes_count} PENDING</span>
-            </div>
-          </div>
-        </Link>
-      </div>
+          </Link>
+        </div>
       </div>
 
       {/* Live Immutable Bitemporal Ledger Ticker */}
-      <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-4">
-        <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--cds-border-subtle)] text-xs">
+      <div className="bg-[#141417] border border-[#202026] p-4 rounded-[2px]">
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#202026] text-xs">
           <div className="flex items-center gap-2 text-white font-semibold uppercase tracking-wider">
             <Time size={14} className="text-[#0f62fe]" />
-            Live Bitemporal Event Stream (Audit Ledger)
+            {t('recentLedgerEvents', 'Live Credit Ledger Transactions')}
           </div>
-          <span className="font-mono text-[11px] text-[var(--cds-text-helper)]">
-            Auto-refreshing &bull; Cryptographic Merkle Root Synced
+          <span className="font-mono text-[11px] text-[#777777]">
+            {t('bitemporalNotice', 'Immutable bitemporal cryptographic ledger logging every submission and score factor.')}
           </span>
         </div>
 
@@ -317,39 +366,47 @@ export default function Home() {
         >
           <table className="w-full text-left text-xs font-mono">
             <thead>
-              <tr className="text-[var(--cds-text-secondary)] text-[10px] uppercase border-b border-[var(--cds-border-subtle)]">
+              <tr className="text-[#999999] text-[10px] uppercase border-b border-[#202026]">
                 <th className="pb-2">Tx ID</th>
-                <th className="pb-2">Event Action</th>
-                <th className="pb-2">Target Entity</th>
-                <th className="pb-2">Valid Time</th>
-                <th className="pb-2">Committed Time</th>
-                <th className="pb-2">Status</th>
+                <th className="pb-2">{locale === 'ne' ? 'कार्य विवरण' : 'Event Action'}</th>
+                <th className="pb-2">{locale === 'ne' ? 'सम्बन्धित पक्ष' : 'Target Entity'}</th>
+                <th className="pb-2">{locale === 'ne' ? 'कारोबार मिति (वि.सं. / A.D.)' : 'Valid Time (B.S. / A.D.)'}</th>
+                <th className="pb-2">{locale === 'ne' ? 'प्रविष्टि मिति' : 'Committed Time'}</th>
+                <th className="pb-2">{locale === 'ne' ? 'स्थिति' : 'Status'}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--cds-border-subtle)]">
+            <tbody className="divide-y divide-[#202026]">
               <tr>
-                <td className="py-2 text-[var(--cds-link-primary)]">TX-2026-99014</td>
-                <td className="py-2 text-white">RHI_MONTHLY_REPORT</td>
-                <td className="py-2 text-[var(--cds-text-secondary)]">IND-8842-1994 (Consumer)</td>
-                <td className="py-2 text-[#8d8d8d]">2026-09-01 00:00:00</td>
+                <td className="py-2 text-[#0f62fe]">TX-NP-2083-99014</td>
+                <td className="py-2 text-white">NEA_UTILITY_PAYMENT_COMMITTED</td>
+                <td className="py-2 text-[#999999]">CIT-27-01-78-04821 (Ram Kumar Shrestha)</td>
+                <td className="py-2 text-[#8d8d8d]">{formatDualDate('2026-09-01', locale)}</td>
                 <td className="py-2 text-[#8d8d8d]">2026-09-21 08:30:12</td>
                 <td className="py-2"><Tag type="green" size="sm" className="m-0">COMMITTED</Tag></td>
               </tr>
               <tr>
-                <td className="py-2 text-[var(--cds-link-primary)]">TX-2026-99013</td>
-                <td className="py-2 text-white">HARD_ENQUIRY_LOGGED</td>
-                <td className="py-2 text-[var(--cds-text-secondary)]">ACN-109-283-912 (Commercial)</td>
-                <td className="py-2 text-[#8d8d8d]">2026-09-20 16:42:00</td>
+                <td className="py-2 text-[#0f62fe]">TX-NP-2083-99013</td>
+                <td className="py-2 text-white">NABIL_HOUSING_LOAN_RHI_BATCH</td>
+                <td className="py-2 text-[#999999]">CIT-27-01-78-04821 (Ram Kumar Shrestha)</td>
+                <td className="py-2 text-[#8d8d8d]">{formatDualDate('2026-08-30', locale)}</td>
                 <td className="py-2 text-[#8d8d8d]">2026-09-20 16:42:01</td>
                 <td className="py-2"><Tag type="green" size="sm" className="m-0">COMMITTED</Tag></td>
               </tr>
               <tr>
-                <td className="py-2 text-[var(--cds-link-primary)]">TX-2026-99012</td>
-                <td className="py-2 text-white">DISPUTE_STATUS_AMENDED</td>
-                <td className="py-2 text-[var(--cds-text-secondary)]">DEF-TEL-2024-881 (Telco)</td>
-                <td className="py-2 text-[#8d8d8d]">2026-08-19 09:11:00</td>
-                <td className="py-2 text-[#8d8d8d]">2026-08-19 09:11:05</td>
-                <td className="py-2"><Tag type="purple" size="sm" className="m-0">UNDER REVIEW</Tag></td>
+                <td className="py-2 text-[#0f62fe]">TX-NP-2083-99012</td>
+                <td className="py-2 text-white">TRADE_CREDIT_HIMSTEEL_INVOICE</td>
+                <td className="py-2 text-[#999999]">PAN-601283912 (Apex Engineering Pvt. Ltd.)</td>
+                <td className="py-2 text-[#8d8d8d]">{formatDualDate('2026-08-01', locale)}</td>
+                <td className="py-2 text-[#8d8d8d]">2026-08-02 11:20:45</td>
+                <td className="py-2"><Tag type="green" size="sm" className="m-0">COMMITTED</Tag></td>
+              </tr>
+              <tr>
+                <td className="py-2 text-[#0f62fe]">TX-NP-2083-99011</td>
+                <td className="py-2 text-white">SECTION_12_DISPUTE_LODGED</td>
+                <td className="py-2 text-[#999999]">DEF-KUKL-2024-881 (KUKL Water Utility)</td>
+                <td className="py-2 text-[#8d8d8d]">{formatDualDate('2026-02-10', locale)}</td>
+                <td className="py-2 text-[#8d8d8d]">2026-02-11 14:15:00</td>
+                <td className="py-2"><Tag type="purple" size="sm" className="m-0">DISPUTED (दफा १२)</Tag></td>
               </tr>
             </tbody>
           </table>

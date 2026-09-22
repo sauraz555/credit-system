@@ -17,10 +17,12 @@ Key Dependencies & Callers:
       and supervisory consoles.
 
 Regulatory & Compliance Context:
-    - Privacy Act 1988 (Cth) Part IIIA & Privacy (Credit Reporting) Code 2014:
-      - Section 20E/20M: Credit provider file access strictly requires an audit log enquiry.
-      - Section 20R: Credit reporting bodies must provide human-readable factors driving score calculations.
-      - APP 11 & Part IIIA Division 2: Rigorous tenant isolation ensuring consumers only view their own file.
+    - Nepal Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५):
+      - Section 12: Subject right to inspect file, demand correction, and lodge disputes.
+      - Transparent disclosure of scoring attribution factors and adverse drivers.
+    - Nepal Rastra Bank (NRB) Directives on Credit Information & Credit Bureau Reporting:
+      - Mandatory enquiry audit logging for licensed BFIs and participating utility providers.
+      - Strict tenant isolation ensuring consumers only view their own credit file.
 """
 
 import json
@@ -95,20 +97,16 @@ def find_entity(entity_id: str, db: Session) -> Optional[Entity]:
         return entity
         
     # 4. Cleaned identifier blind index (e.g. stripped formatting prefixes)
-    clean_id = entity_id.replace("-", "").replace("IND", "").replace("ACN", "").replace("ABN", "").strip()
+    clean_id = entity_id.replace("-", "").replace("CIT", "").replace("NID", "").replace("PAN", "").replace("VAT", "").replace("OCR", "").replace("IND", "").replace("ACN", "").replace("ABN", "").strip()
     if clean_id:
         clean_blind_idx = compute_blind_index(clean_id)
         entity = db.query(Entity).filter(Entity.identifier_blind_index == clean_blind_idx).first()
         if entity:
             return entity
-            
-    return None
 
-    # Fallback: match by name in basic_info
+    # 5. Fallback: match by name or citizenship/pan in basic_info
     entity = db.query(Entity).filter(
-        or_(
-            Entity.basic_info.cast(str).ilike(f"%{entity_id}%")
-        )
+        cast(Entity.basic_info, String).ilike(f"%{entity_id}%")
     ).first()
     return entity
 
@@ -307,7 +305,7 @@ def get_report(
             enquiry = Enquiry(
                 entity_id=entity.id,
                 user_id=current_user.id,
-                reason="Comprehensive Bureau Credit Assessment (Privacy Act 1988 Part IIIA)"
+                reason="Comprehensive Bureau Credit Assessment (Nepal Individual Privacy Act 2018)"
             )
             db.add(enquiry)
             db.commit()

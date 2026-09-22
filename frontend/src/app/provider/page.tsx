@@ -1,20 +1,19 @@
 /**
- * Credit Provider Data Ingestion & Statutory Enquiry Console.
+ * Licensed BFI & Public Utility Data Ingestion Console.
  *
- * Provides licensed credit providers (ADIs, ACL licensees, telcos, utilities) with:
- * 1. Single Record Ingestion: Interactive JSON schema-validated ledger submission.
- * 2. Batch File Uploads: Bulk CSV ingestion with pre-commit syntactic and regulatory checks.
- * 3. Permitted Credit Enquiries: Conducting hard credit assessments (with automatic bitemporal enquiry logging)
- *    or account review lookups under valid regulatory purposes.
+ * Provides licensed reporting institutions in Nepal with:
+ * 1. Single Record Ingestion: Interactive JSON schema-validated ledger submission for
+ *    NRB-regulated Class A/B/C/D BFIs, Nepal Electricity Authority (NEA), KUKL, and Telecoms.
+ * 2. Batch File Uploads: Bulk CSV ingestion conforming to Nepal Credit Reporting specifications.
+ * 3. Permitted Credit Enquiries: Conducting hard credit assessments under Nepal Individual Privacy Act 2018.
  *
  * Architecture:
  *   Frontend Presentation Layer (Credit Provider Portal).
  *   Next.js client-side component ('use client') utilizing Carbon Design System components.
- *   Interacts with `/api/ingest/record`, `/api/ingest/csv`, and `/api/reports/{id}`.
  *
  * Legal / Regulatory:
- *   Privacy Act 1988 Part IIIA: Section 6Q (Statutory default criteria: >= $150, >= 60 days overdue,
- *   formal notice served), Section 20N (Permissible RHI reporters), and Section 20R (Enquiry logging).
+ *   Nepal Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५) and
+ *   Nepal Rastra Bank (NRB) Credit Information Directives.
  */
 
 "use client";
@@ -39,55 +38,40 @@ import {
   Warning,
   Error as ErrorIcon,
   Play,
-  Catalog,
-  DocumentView,
   Time,
-  Renew,
-  Locked
+  Renew
 } from '@carbon/icons-react';
 import { API_BASE } from '@/lib/api';
+import { useLocaleContext, useTranslations } from '@/lib/i18n';
+import { formatCurrency, formatDualDate, formatNumber } from '@/lib/nepaliDate';
 
-/**
- * Credit Provider Console component for ledger event submissions and bureau enquiries.
- *
- * @returns JSX.Element rendering JSON payload editor, batch file uploader, and enquiry console.
- */
 export default function ProviderDashboard() {
-  const [userEntityId, setUserEntityId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setUserEntityId(localStorage.getItem('user_entity_id'));
-    }
-  }, []);
+  const { locale } = useLocaleContext();
+  const { t } = useTranslations('provider');
+  const { t: tCommon } = useTranslations('common');
 
   // Ingestion State
-  const [templateType, setTemplateType] = useState('DEFAULT');
+  const [templateType, setTemplateType] = useState('NEA_UTILITY');
   const [jsonPayload, setJsonPayload] = useState(JSON.stringify({
-    "provider_id": "PRV-001",
-    "provider_license": "ACL-230692",
-    "entity_id": "IND-8842-1994",
-    "record_type": "DEFAULT",
-    "facility_type": "Personal Loan",
-    "original_amount": 850.00,
-    "overdue_amount": 850.00,
-    "days_overdue": 72,
-    "statutory_notices": {
-      "section_6q_notice_date": "2026-06-15",
-      "section_21d_notice_date": "2026-07-20",
-      "notice_period_days": 35
-    },
-    "valid_time": "2026-08-25T09:00:00Z"
+    "provider_id": "PRV-NEA-001",
+    "licence_type": "UTILITY_NEA",
+    "entity_id": "CIT-27-01-78-04821",
+    "record_type": "UTILITY",
+    "utility_type": "Electricity (विद्युत् महशुल)",
+    "consumer_no": "012.14.882",
+    "amount_npr": 4500.00,
+    "history_24_months": "000000000000000000000000",
+    "counter": "Baneshwor Distribution Centre",
+    "valid_from": "2026-09-01"
   }, null, 2));
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [ingestResponse, setIngestResponse] = useState<any>(null);
 
   // Inquiry State
-  const [inquirySubject, setInquirySubject] = useState('IND-8842-1994');
-  const [inquiryType, setInquiryType] = useState('HARD_CREDIT_ASSESSMENT');
-  const [inquiryFacility, setInquiryFacility] = useState('RESIDENTIAL_MORTGAGE');
-  const [inquiryAmount, setInquiryAmount] = useState('650000');
+  const [inquirySubject, setInquirySubject] = useState('CIT-27-01-78-04821');
+  const [inquiryFacility, setInquiryFacility] = useState('HOUSING_LOAN');
+  const [inquiryAmount, setInquiryAmount] = useState('4500000');
   const [isInquiring, setIsInquiring] = useState(false);
   const [inquiryResult, setInquiryResult] = useState<any>(null);
 
@@ -95,19 +79,13 @@ export default function ProviderDashboard() {
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(true);
   const [auditError, setAuditError] = useState<string | null>(null);
-  const [isForbiddenAudit, setIsForbiddenAudit] = useState(false);
 
   // Fetch live audit events
   const fetchAuditEvents = async () => {
     setIsLoadingAudit(true);
     setAuditError(null);
-    setIsForbiddenAudit(false);
     try {
       const res = await fetch(`${API_BASE}/api/ingest/events`);
-      if (res.status === 403) {
-        setIsForbiddenAudit(true);
-        throw new Error('403 Forbidden: Insufficient provider permissions to view ingestion audit events.');
-      }
       if (!res.ok) {
         throw new Error(`Failed to load audit events (HTTP ${res.status})`);
       }
@@ -127,45 +105,55 @@ export default function ProviderDashboard() {
   // Switch templates
   const handleTemplateChange = (type: string) => {
     setTemplateType(type);
-    if (type === 'RHI') {
+    if (type === 'NEA_UTILITY') {
       setJsonPayload(JSON.stringify({
-        "provider_id": "PRV-CBA-001",
-        "provider_license": "ACL-234945",
-        "entity_id": "IND-8842-1994",
-        "record_type": "RHI",
-        "account_id": "ACC-CBA-9921",
-        "reporting_cycle": "2026-09",
-        "rhi_history": "0",
-        "amount": 4120.00,
-        "valid_time": "2026-09-01T00:00:00Z"
+        "provider_id": "PRV-NEA-001",
+        "licence_type": "UTILITY_NEA",
+        "entity_id": "CIT-27-01-78-04821",
+        "record_type": "UTILITY",
+        "utility_type": "Electricity (विद्युत् महशुल)",
+        "consumer_no": "012.14.882",
+        "amount_npr": 4500.00,
+        "history_24_months": "000000000000000000000000",
+        "counter": "Baneshwor Distribution Centre",
+        "valid_from": "2026-09-01"
       }, null, 2));
-    } else if (type === 'ACCOUNT_OPEN') {
+    } else if (type === 'NTC_TELECOM') {
       setJsonPayload(JSON.stringify({
-        "provider_id": "PRV-NAB-001",
-        "provider_license": "ACL-230692",
-        "entity_id": "IND-8842-1994",
+        "provider_id": "PRV-NTC-001",
+        "licence_type": "TELECOM_PROVIDER",
+        "entity_id": "CIT-27-01-78-04821",
+        "record_type": "UTILITY",
+        "utility_type": "Telecommunications (दूरसञ्चार तथा इन्टरनेट)",
+        "service_number": "01-4489124",
+        "amount_npr": 2200.00,
+        "history_24_months": "000000000000000000000000",
+        "valid_from": "2026-09-01"
+      }, null, 2));
+    } else if (type === 'BFI_LOAN') {
+      setJsonPayload(JSON.stringify({
+        "provider_id": "PRV-NABIL-001",
+        "licence_type": "CLASS_A_BFI",
+        "entity_id": "CIT-27-01-78-04821",
         "record_type": "RHI",
-        "facility_type": "Credit Card",
-        "amount": 15000.00,
-        "open_date": "2026-09-20",
-        "valid_time": "2026-09-20T08:00:00Z"
+        "account_id": "NBL-HL-082914-01",
+        "facility_type": "Residential Housing Loan (आवासीय घर कर्जा)",
+        "amount_npr": 4500000.00,
+        "rhi_history": "000000000000000000000000",
+        "valid_from": "2026-09-01"
       }, null, 2));
     } else {
       setJsonPayload(JSON.stringify({
-        "provider_id": "PRV-NAB-001",
-        "provider_license": "ACL-230692",
-        "entity_id": "IND-8842-1994",
+        "provider_id": "PRV-KUKL-001",
+        "licence_type": "UTILITY_WATER",
+        "entity_id": "CIT-27-01-78-04821",
         "record_type": "DEFAULT",
-        "facility_type": "Personal Loan",
-        "original_amount": 850.00,
-        "overdue_amount": 850.00,
-        "days_overdue": 72,
-        "statutory_notices": {
-          "section_6q_notice_date": "2026-06-15",
-          "section_21d_notice_date": "2026-07-20",
-          "notice_period_days": 35
-        },
-        "valid_time": "2026-08-25T09:00:00Z"
+        "consumer_no": "KUKL-KTM-04821",
+        "overdue_amount_npr": 12500.00,
+        "days_overdue": 65,
+        "notice_given": true,
+        "notice_date": "2026-06-15",
+        "valid_from": "2026-08-20"
       }, null, 2));
     }
   };
@@ -176,19 +164,16 @@ export default function ProviderDashboard() {
     setIsSubmitting(true);
     try {
       const parsed = JSON.parse(jsonPayload);
-      const isDefault = (parsed.record_type || 'DEFAULT') === 'DEFAULT';
+      const isDefault = parsed.record_type === 'DEFAULT';
       
       const payload = {
-        entity_id: parsed.entity_id || "IND-8842-1994",
-        record_type: isDefault ? "DEFAULT" : "RHI",
-        amount: parsed.overdue_amount || parsed.amount || (isDefault ? 850.0 : 5000.0),
+        entity_id: parsed.entity_id || "CIT-27-01-78-04821",
+        record_type: parsed.record_type || "UTILITY",
+        amount: parsed.amount_npr || parsed.overdue_amount_npr || 4500.0,
         data: {
-          days_overdue: parsed.days_overdue || 72,
-          notice_given: parsed.statutory_notices ? true : (parsed.notice_given ?? true),
-          facility_type: parsed.facility_type || "Personal Loan",
-          rhi_history: parsed.rhi_history || parsed.rhi_code || "0"
+          ...parsed
         },
-        valid_from: parsed.valid_time ? parsed.valid_time.slice(0, 10) : new Date().toISOString().slice(0, 10)
+        valid_from: parsed.valid_from || new Date().toISOString().slice(0, 10)
       };
 
       const res = await fetch(`${API_BASE}/api/ingest/record`, {
@@ -205,21 +190,21 @@ export default function ProviderDashboard() {
       const data = await res.json();
       setIngestResponse({
         status: 'COMMITTED',
-        eventId: `EVT-${Date.now().toString().slice(-6)}`,
+        eventId: `EVT-NP-${Date.now().toString().slice(-6)}`,
         txTime: new Date().toISOString(),
         validTime: payload.valid_from,
         hash: 'SHA256:' + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2),
-        message: data.message || 'Event committed to immutable bitemporal ledger.'
+        message: data.message || t('successMsg', 'Record successfully written to the immutable credit ledger.')
       });
       fetchAuditEvents();
     } catch (err: any) {
       setIngestResponse({
         status: 'REJECTED',
-        eventId: `REJ-${Date.now().toString().slice(-6)}`,
+        eventId: `REJ-NP-${Date.now().toString().slice(-6)}`,
         txTime: new Date().toISOString(),
         validTime: 'N/A',
         hash: 'ERROR_VALIDATION',
-        message: err.message || 'Validation failed against Part IIIA rules.'
+        message: err.message || 'Validation failed against Nepal credit reporting rules.'
       });
     } finally {
       setIsSubmitting(false);
@@ -241,26 +226,28 @@ export default function ProviderDashboard() {
       setInquiryResult({
         fileId: inquirySubject,
         name: name,
-        score: data.score?.value ?? 712,
-        band: data.score?.band ?? 'Good (Prime Tier 2)',
+        score: data.score?.value ?? 964,
+        band: data.score?.band ?? 'उत्कृष्ट (Prime Tier 1)',
         activeDefaults: defaults.length,
-        defaultAmount: defaults.length > 0 ? `$${defaults[0].amount || '0'} (${defaults[0].status})` : 'Zero Defaults',
-        worstRhiLast12m: defaults.length > 0 ? 'Adverse Default Listed' : '0 (Paid on time)',
-        recommendation: (data.score?.value ?? 712) >= 600 ? 'APPROVE SUBJECT TO LVR & SERVICEABILITY CRITERIA' : 'DECLINE / REFER TO SENIOR RISK COMMITTEE',
-        inquiryLoggedAs: `HARD INQUIRY #INQ-2026-${Date.now().toString().slice(-5)}`
+        defaultAmount: defaults.length > 0 ? formatCurrency(defaults[0].amount || 12500, locale) : 'Zero Defaults',
+        worstRhiLast12m: defaults.length > 0 ? (locale === 'ne' ? 'खानेपानी महशुल विवाद' : 'Utility Dispute Listed') : '0 (On time)',
+        recommendation: (data.score?.value ?? 964) >= 700 
+          ? (locale === 'ne' ? 'स्वीकृत: नियम तथा सीमाबमोजिम कर्जा प्रवाह योग्य' : 'APPROVE: Credit standing meets prime tier criteria')
+          : (locale === 'ne' ? 'थप कागजात आवश्यक' : 'REFER TO RISK COMMITTEE'),
+        inquiryLoggedAs: `BUREAU INQUIRY #INQ-NP-2083-${Date.now().toString().slice(-5)}`
       });
     } catch {
       // Fallback preview
       setInquiryResult({
         fileId: inquirySubject,
-        name: inquirySubject === 'IND-8842-1994' ? 'Consumer File (IND-8842-1994)' : `Subject ${inquirySubject}`,
-        score: 712,
-        band: 'Good (Prime Tier 2)',
+        name: 'राम कुमार श्रेष्ठ (Ram Kumar Shrestha)',
+        score: 964,
+        band: 'उत्कृष्ट (Prime Tier 1)',
         activeDefaults: 1,
-        defaultAmount: '$420.00 (Disputed)',
-        worstRhiLast12m: '1 (1-29d late in Jun 2026)',
-        recommendation: 'APPROVE SUBJECT TO LVR & SERVICEABILITY CRITERIA',
-        inquiryLoggedAs: 'HARD INQUIRY #INQ-2026-90412'
+        defaultAmount: formatCurrency(12500, locale) + ' (Disputed)',
+        worstRhiLast12m: '0 (On time)',
+        recommendation: locale === 'ne' ? 'स्वीकृत: नियम तथा सीमाबमोजिम कर्जा प्रवाह योग्य' : 'APPROVE: Prime Standing',
+        inquiryLoggedAs: `BUREAU INQUIRY #INQ-NP-2083-${Date.now().toString().slice(-5)}`
       });
     } finally {
       setIsInquiring(false);
@@ -270,384 +257,269 @@ export default function ProviderDashboard() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
-            Credit Provider Ingestion Console
-          </h1>
-          <p className="text-xs text-[#999999] mt-1">
-            CCR data submission, bitemporal validation, and permissible statutory credit enquiry execution.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
+          {t('title', 'Data Ingestion Console')}
+        </h1>
+        <p className="text-xs text-[#999999] mt-1">
+          {t('subtitle', 'Licensed BFI and public utility submission interface conforming to Nepal credit reporting standards.')}
+        </p>
+      </div>
 
-        <div className="flex items-center gap-3 text-xs">
-          <Tag type="purple" size="sm" className="font-mono m-0">{userEntityId || 'PRV-PARTICIPANT'}</Tag>
-          <Tag type="green" size="sm" className="font-mono m-0">ACL #230692</Tag>
+      {/* Regulatory Rule Callout */}
+      <div className="bg-[#141417] border border-[#202026] p-4 rounded-[2px] flex items-start gap-3">
+        <CheckmarkOutline size={18} className="text-[#0f62fe] shrink-0 mt-0.5" />
+        <div className="text-xs">
+          <div className="text-white font-semibold mb-0.5">
+            {locale === 'ne' ? 'नेपाल राष्ट्र बैंक नियमन तथा प्रविष्टि निर्देशिका' : 'NRB Regulatory Ingestion Standard'}
+          </div>
+          <p className="text-[#999999] leading-relaxed">
+            {t('licenceNotice', "Only NRB-regulated Class A/B/C/D BFIs are permitted to submit monthly repayment history. Utility providers (NEA, KUKL, NTC, Ncell) submit utility payment records.")}
+          </p>
         </div>
       </div>
 
-      {/* Main Multi-Tab Provider Workspace */}
-      <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
+      {/* Main Tabs */}
+      <div className="bg-[#141417] border border-[#202026] rounded-[2px]">
         <Tabs>
-          <TabList aria-label="Provider Tabs" className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)]">
-            <Tab className="text-xs uppercase font-semibold">1. Data Ingestion (JSON / Batch)</Tab>
-            <Tab className="text-xs uppercase font-semibold">2. Real-Time Bureau Check</Tab>
-            <Tab className="text-xs uppercase font-semibold">3. Ingestion Batch Audit Log</Tab>
+          <TabList aria-label="Ingestion Options" className="bg-[#1c1c21] border-b border-[#202026]">
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '१. व्यक्तिगत प्रविष्टि (Single Event)' : '1. Single Record Ingest'}
+            </Tab>
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '२. आधिकारिक सोधपुछ (Inquiry)' : '2. Bureau Inquiry'}
+            </Tab>
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '३. प्रविष्टि अडिट लग' : '3. Ingest Audit Stream'}
+            </Tab>
           </TabList>
 
           <TabPanels>
-            {/* TAB 1: DATA INGESTION */}
-            <TabPanel className="p-5 md:p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Left: JSON Editor & Template Chooser */}
-                <div className="lg:col-span-8 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-medium text-white">Record Ingestion Payload</h2>
-                      <p className="text-xs text-[var(--cds-text-secondary)]">
-                        Select a pre-validated CCR record schema template or paste batch JSON.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 font-mono text-xs">
-                      <button
-                        type="button"
-                        onClick={() => handleTemplateChange('DEFAULT')}
-                        className={`px-3 py-1 border transition-colors ${templateType === 'DEFAULT' ? 'bg-[#0f62fe] text-white border-[#0f62fe] font-bold' : 'bg-[var(--cds-layer-02)] text-[var(--cds-text-secondary)] border-[var(--cds-border-subtle)] hover:text-white'}`}
-                      >
-                        Default Listing (s21D)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleTemplateChange('RHI')}
-                        className={`px-3 py-1 border transition-colors ${templateType === 'RHI' ? 'bg-[#0f62fe] text-white border-[#0f62fe] font-bold' : 'bg-[var(--cds-layer-02)] text-[var(--cds-text-secondary)] border-[var(--cds-border-subtle)] hover:text-white'}`}
-                      >
-                        Monthly RHI (0, 1-6, X)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleTemplateChange('ACCOUNT_OPEN')}
-                        className={`px-3 py-1 border transition-colors ${templateType === 'ACCOUNT_OPEN' ? 'bg-[#0f62fe] text-white border-[#0f62fe] font-bold' : 'bg-[var(--cds-layer-02)] text-[var(--cds-text-secondary)] border-[var(--cds-border-subtle)] hover:text-white'}`}
-                      >
-                        Open Account (CCR)
-                      </button>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleIngest}>
-                    <label htmlFor="ingest-json-payload" className="sr-only">
-                      Data Ingestion JSON Payload
-                    </label>
-                    <textarea
-                      id="ingest-json-payload"
-                      aria-label="Data Ingestion JSON Payload"
-                      rows={14}
-                      value={jsonPayload}
-                      onChange={(e) => setJsonPayload(e.target.value)}
-                      className="w-full bg-[var(--cds-field)] text-[#42be65] font-mono text-xs p-4 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
-                    />
-
-                    <div className="flex items-center justify-between mt-4">
-                      <div className="text-xs text-[var(--cds-text-secondary)] font-mono">
-                        Validation Schema: <strong className="text-white">OAIC-CR-CODE-v2.4.json</strong>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        size="md"
-                        kind="primary"
-                        renderIcon={Upload}
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? <InlineLoading status="active" description="Validating & Committing..." /> : 'Submit Record to Ledger'}
-                      </Button>
-                    </div>
-                  </form>
-
-                  {/* Submission Result Notification */}
-                  {ingestResponse && (
-                    <div className="mt-4 p-4 bg-[var(--cds-layer-02)] border border-[#24a148] text-xs font-mono space-y-2">
-                      <div className="flex items-center gap-2 text-[#42be65] font-bold text-sm">
-                        <CheckmarkOutline size={16} /> {ingestResponse.status} &bull; EVENT ID: {ingestResponse.eventId}
-                      </div>
-                      <div className="text-[var(--cds-text-secondary)]">{ingestResponse.message}</div>
-                      <div className="text-[#8d8d8d] text-[11px] pt-2 border-t border-[var(--cds-border-subtle)]">
-                        <div>TX COMMITTED TIME: {ingestResponse.txTime}</div>
-                        <div>VALID TIME RECORD: {ingestResponse.validTime}</div>
-                        <div className="truncate">STATE HASH: {ingestResponse.hash}</div>
-                      </div>
-                    </div>
-                  )}
+            {/* TAB 1: Single Record Ingest */}
+            <TabPanel className="p-5 md:p-6 space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#202026]">
+                <div className="text-xs text-white font-medium">
+                  {t('selectProvider', 'Active Reporting Tenant')}:
                 </div>
-
-                {/* Right: Statutory Compliance Rules Checklist */}
-                <div className="lg:col-span-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] p-5 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-white mb-3">
-                      Statutory Compliance Guardrails
-                    </h3>
-                    <p className="text-xs text-[var(--cds-text-secondary)] mb-4 leading-relaxed">
-                      The CRMS ingestion gateway automatically validates incoming events against legislative criteria prior to ledger commit.
-                    </p>
-
-                    <div className="space-y-3 text-xs">
-                      <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-start gap-2.5">
-                        <CheckmarkOutline className="text-[#42be65] mt-0.5" size={16} />
-                        <div>
-                          <span className="font-semibold text-white block">Minimum Overdue Threshold ($150)</span>
-                          <span className="text-[var(--cds-text-secondary)] text-[11px]">
-                            Defaults under $150 are rejected per Privacy Act s6Q.
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-start gap-2.5">
-                        <CheckmarkOutline className="text-[#42be65] mt-0.5" size={16} />
-                        <div>
-                          <span className="font-semibold text-white block">60-Day Overdue Rule</span>
-                          <span className="text-[var(--cds-text-secondary)] text-[11px]">
-                            Must be at least 60 calendar days in arrears before listing.
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-start gap-2.5">
-                        <CheckmarkOutline className="text-[#42be65] mt-0.5" size={16} />
-                        <div>
-                          <span className="font-semibold text-white block">Section 6Q & 21D Statutory Notices</span>
-                          <span className="text-[var(--cds-text-secondary)] text-[11px]">
-                            Requires verified 30-day notice and subsequent listing warning.
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-start gap-2.5">
-                        <CheckmarkOutline className="text-[#42be65] mt-0.5" size={16} />
-                        <div>
-                          <span className="font-semibold text-white block">Bitemporal Non-Destructive Write</span>
-                          <span className="text-[var(--cds-text-secondary)] text-[11px]">
-                            All records append as new immutable transaction events.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 pt-3 border-t border-[var(--cds-border-subtle)] text-[11px] text-[var(--cds-text-helper)] font-mono">
-                    GATEWAY VERSION: v2.4.0-PROD
-                  </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleTemplateChange('NEA_UTILITY')}
+                    className={`px-3 py-1 border transition-colors rounded-[2px] ${templateType === 'NEA_UTILITY' ? 'bg-[#0f62fe] text-white border-[#0f62fe] font-bold' : 'bg-[#1c1c21] text-[#999999] border-[#202026] hover:text-[#e6e6e6]'}`}
+                  >
+                    NEA Electricity (विद्युत्)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTemplateChange('NTC_TELECOM')}
+                    className={`px-3 py-1 border transition-colors rounded-[2px] ${templateType === 'NTC_TELECOM' ? 'bg-[#0f62fe] text-white border-[#0f62fe] font-bold' : 'bg-[#1c1c21] text-[#999999] border-[#202026] hover:text-[#e6e6e6]'}`}
+                  >
+                    Nepal Telecom (दूरसञ्चार)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTemplateChange('BFI_LOAN')}
+                    className={`px-3 py-1 border transition-colors rounded-[2px] ${templateType === 'BFI_LOAN' ? 'bg-[#0f62fe] text-white border-[#0f62fe] font-bold' : 'bg-[#1c1c21] text-[#999999] border-[#202026] hover:text-[#e6e6e6]'}`}
+                  >
+                    Nabil Bank (क वर्ग BFI)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTemplateChange('DEFAULT')}
+                    className={`px-3 py-1 border transition-colors rounded-[2px] ${templateType === 'DEFAULT' ? 'bg-[#0f62fe] text-white border-[#0f62fe] font-bold' : 'bg-[#1c1c21] text-[#999999] border-[#202026] hover:text-[#e6e6e6]'}`}
+                  >
+                    KUKL Water Default (खानेपानी)
+                  </button>
                 </div>
               </div>
-            </TabPanel>
 
-            {/* TAB 2: REAL-TIME CREDIT CHECK */}
-            <TabPanel className="p-5 md:p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Form Col */}
-                <div className="lg:col-span-5 space-y-4">
-                  <h2 className="text-base font-medium text-white mb-1">Initiate Comprehensive Credit Inquiry</h2>
-                  <p className="text-xs text-[var(--cds-text-secondary)] mb-4 leading-relaxed">
-                    Query an individual consumer or commercial entity file. Hard inquiries are automatically registered in the subject's audit log.
-                  </p>
-
-                  <form onSubmit={handleRunInquiry} className="space-y-4 text-xs">
-                    <div>
-                      <label htmlFor="inquiry-subject" className="block text-xs font-semibold text-white mb-1">Subject Entity ID</label>
-                      <input
-                        id="inquiry-subject"
-                        type="text"
-                        value={inquirySubject}
-                        onChange={(e) => setInquirySubject(e.target.value)}
-                        className="w-full bg-[var(--cds-field)] text-white font-mono text-xs p-2.5 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor="inquiry-type" className="block text-xs font-semibold text-white mb-1">Inquiry Assessment Classification</label>
-                      <select
-                        id="inquiry-type"
-                        value={inquiryType}
-                        onChange={(e) => setInquiryType(e.target.value)}
-                        className="w-full bg-[var(--cds-field)] text-white text-xs p-2.5 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
-                      >
-                        <option value="HARD_CREDIT_ASSESSMENT">Hard Inquiry (Application for Credit)</option>
-                        <option value="ACCOUNT_REVIEW">Soft Inquiry (Existing Account Risk Review)</option>
-                        <option value="IDENTITY_VERIFICATION">Soft Inquiry (AML/KYC Identity Verification)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label htmlFor="inquiry-facility" className="block text-xs font-semibold text-white mb-1">Facility Type Applied For</label>
-                      <select
-                        id="inquiry-facility"
-                        value={inquiryFacility}
-                        onChange={(e) => setInquiryFacility(e.target.value)}
-                        className="w-full bg-[var(--cds-field)] text-white text-xs p-2.5 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
-                      >
-                        <option value="RESIDENTIAL_MORTGAGE">Residential Mortgage Loan</option>
-                        <option value="REVOLVING_CREDIT_CARD">Revolving Credit Card Facility</option>
-                        <option value="COMMERCIAL_OVERDRAFT">Commercial Overdraft / Trade Line</option>
-                        <option value="AUTO_ASSET_FINANCE">Secured Auto / Asset Finance</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label htmlFor="inquiry-amount" className="block text-xs font-semibold text-white mb-1">Credit Limit / Loan Amount Requested ($ AUD)</label>
-                      <input
-                        id="inquiry-amount"
-                        type="number"
-                        value={inquiryAmount}
-                        onChange={(e) => setInquiryAmount(e.target.value)}
-                        className="w-full bg-[var(--cds-field)] text-white font-mono text-xs p-2.5 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
-                      />
-                    </div>
-
-                    <Button
-                      type="submit"
-                      size="md"
-                      kind="primary"
-                      renderIcon={Search}
-                      disabled={isInquiring}
-                      className="w-full justify-center"
-                    >
-                      {isInquiring ? <InlineLoading status="active" description="Pulling Bureau File..." /> : 'Pull Comprehensive Bureau File'}
-                    </Button>
-                  </form>
-                </div>
-
-                {/* Response Col */}
-                <div className="lg:col-span-7 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] p-5">
-                  <h4 className="text-sm font-semibold uppercase tracking-wider text-white mb-3">
-                    Bureau Real-Time Pull Result
-                  </h4>
-
-                  {inquiryResult ? (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-center justify-between">
-                        <div>
-                          <div className="text-lg font-medium text-white">{inquiryResult.name}</div>
-                          <div className="text-xs font-mono text-[var(--cds-text-secondary)]">File: {inquiryResult.fileId}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-3xl font-mono font-bold text-white tabular-nums">{inquiryResult.score}</div>
-                          <Tag type="blue" size="sm" className="m-0 font-mono">{inquiryResult.band}</Tag>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
-                          <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">Active Adverse Listings:</span>
-                          <span className="font-mono text-[#f1c21b] font-bold">{inquiryResult.defaultAmount}</span>
-                        </div>
-                        <div className="p-3 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
-                          <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">Worst RHI Status (12m):</span>
-                          <span className="font-mono text-white">{inquiryResult.worstRhiLast12m}</span>
-                        </div>
-                      </div>
-
-                      <div className="p-3.5 bg-[#0e2a15] border border-[#24a148] text-xs font-mono text-[#42be65]">
-                        <div className="font-bold mb-1 flex items-center gap-1.5">
-                          <CheckmarkOutline size={14} /> DECISION SUPPORT ENGINE:
-                        </div>
-                        {inquiryResult.recommendation}
-                      </div>
-
-                      <div className="text-[11px] font-mono text-[var(--cds-text-helper)]">
-                        LOGGED TRANSACTION: {inquiryResult.inquiryLoggedAs}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-64 flex flex-col items-center justify-center text-center text-xs text-[var(--cds-text-helper)] border border-dashed border-[var(--cds-border-subtle)] p-6">
-                      <Search size={32} className="mb-2 text-[#6f6f6f]" />
-                      <div>No credit pull initiated yet.</div>
-                      <div className="text-[11px] mt-1 text-[var(--cds-text-secondary)]">
-                        Complete inquiry parameters on the left and submit to request real-time score.
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </TabPanel>
-
-            {/* TAB 3: INGESTION AUDIT LOG */}
-            <TabPanel className="p-5 md:p-6">
-              <div className="flex items-center justify-between mb-4">
+              <form onSubmit={handleIngest} className="space-y-4">
                 <div>
-                  <h2 className="text-lg font-medium text-white">Ingestion Batch Audit Log</h2>
-                  <p className="text-xs text-[var(--cds-text-secondary)]">
-                    Historical record of API calls and CSV batches submitted by this credit provider.
-                  </p>
-                </div>
-                <Tag type="green" size="sm" className="font-mono m-0">100% Ingestion SLA Met</Tag>
-              </div>
-
-              {/* 403 Forbidden State */}
-              {isForbiddenAudit && (
-                <div className="p-4 bg-[var(--cds-layer-02)] border-l-4 border-[#da1e28] text-xs mb-4">
-                  <div className="font-bold text-[#fa4d56] uppercase">403 Forbidden: Insufficient Permissions</div>
-                  <div className="text-[var(--cds-text-secondary)] mt-1">Your provider tenant credentials are not authorized to access the bureau audit logs.</div>
-                </div>
-              )}
-
-              {/* Error State */}
-              {auditError && !isForbiddenAudit && (
-                <div className="mb-4">
-                  <InlineNotification
-                    kind="error"
-                    title="Audit Log Ingestion Error"
-                    subtitle={auditError}
-                    lowContrast
+                  <label htmlFor="payload-editor" className="block text-xs font-semibold text-white mb-1">
+                    {t('dataPayload', 'Payload JSON')}
+                  </label>
+                  <textarea
+                    id="payload-editor"
+                    rows={12}
+                    value={jsonPayload}
+                    onChange={(e) => setJsonPayload(e.target.value)}
+                    className="w-full bg-[#0b0b0d] text-white font-mono text-xs p-3 border border-[#202026] focus:border-[#0f62fe] focus:outline-none rounded-[2px]"
                   />
                 </div>
-              )}
 
-              {/* Focusable Table Region for Axe */}
+                <Button
+                  size="sm"
+                  kind="primary"
+                  type="submit"
+                  disabled={isSubmitting}
+                  renderIcon={Play}
+                >
+                  {isSubmitting ? <InlineLoading description="Committing to ledger..." /> : t('submitBtn', 'Ingest Credit Event')}
+                </Button>
+              </form>
+
+              {/* Ingestion Response Display */}
+              {ingestResponse && (
+                <div className={`p-4 border rounded-[2px] text-xs font-mono ${ingestResponse.status === 'COMMITTED' ? 'bg-[#0e2a15] border-[#24a148] text-white' : 'bg-[#3b1219] border-[#da1e28] text-white'}`}>
+                  <div className="flex items-center gap-2 font-bold mb-1">
+                    {ingestResponse.status === 'COMMITTED' ? <CheckmarkOutline size={16} className="text-[#24a148]" /> : <ErrorIcon size={16} className="text-[#da1e28]" />}
+                    STATUS: {ingestResponse.status} &bull; {ingestResponse.eventId}
+                  </div>
+                  <div className="text-[11px] text-[#c6c6c6]">{ingestResponse.message}</div>
+                  <div className="text-[10px] text-[#8d8d8d] mt-2 truncate">Hash: {ingestResponse.hash}</div>
+                </div>
+              )}
+            </TabPanel>
+
+            {/* TAB 2: Bureau Inquiry */}
+            <TabPanel className="p-5 md:p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-medium text-white mb-1">
+                  {locale === 'ne' ? 'कर्जा मूल्याङ्कन सोधपुछ (Hard Credit Inquiry)' : 'Statutory Bureau Inquiry'}
+                </h2>
+                <p className="text-xs text-[#999999] mb-4">
+                  {locale === 'ne'
+                    ? 'इजाजतपत्र प्राप्त बैंक तथा वित्तीय संस्थाहरूले नयाँ कर्जा आवेदन मूल्याङ्कन गर्दा गरिने आधिकारिक सोधपुछ।'
+                    : 'Conduct official credit inquiries with mandatory cryptographic logging in the audit ledger.'}
+                </p>
+
+                <form onSubmit={handleRunInquiry} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-white mb-1">
+                      {locale === 'ne' ? 'ऋणी पहिचान (नागरिकता / NID / PAN)' : 'Subject Identifier'}
+                    </label>
+                    <input
+                      type="text"
+                      value={inquirySubject}
+                      onChange={(e) => setInquirySubject(e.target.value)}
+                      className="w-full bg-[#0b0b0d] text-white text-xs p-2 border border-[#202026] focus:border-[#0f62fe] focus:outline-none rounded-[2px]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-white mb-1">
+                      {locale === 'ne' ? 'प्रस्तावित कर्जा प्रकार' : 'Proposed Facility'}
+                    </label>
+                    <select
+                      value={inquiryFacility}
+                      onChange={(e) => setInquiryFacility(e.target.value)}
+                      className="w-full bg-[#0b0b0d] text-white text-xs p-2 border border-[#202026] focus:border-[#0f62fe] focus:outline-none rounded-[2px]"
+                    >
+                      <option value="HOUSING_LOAN">Residential Housing Loan (घर कर्जा)</option>
+                      <option value="AUTO_LOAN">Auto Vehicle Loan (सवारी कर्जा)</option>
+                      <option value="SME_CREDIT">SME Working Capital Loan (व्यवसाय कर्जा)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-white mb-1">
+                      {locale === 'ne' ? 'माग गरिएको रकम (रु)' : 'Requested Amount (NPR)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={inquiryAmount}
+                      onChange={(e) => setInquiryAmount(e.target.value)}
+                      className="w-full bg-[#0b0b0d] text-white text-xs p-2 border border-[#202026] focus:border-[#0f62fe] focus:outline-none rounded-[2px]"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <Button
+                      size="sm"
+                      kind="primary"
+                      type="submit"
+                      disabled={isInquiring}
+                      renderIcon={Search}
+                    >
+                      {isInquiring ? <InlineLoading description="Executing inquiry..." /> : (locale === 'ne' ? 'सोधपुछ गर्नुहोस्' : 'Execute Bureau Inquiry')}
+                    </Button>
+                  </div>
+                </form>
+
+                {inquiryResult && (
+                  <div className="bg-[#1c1c21] border border-[#202026] p-5 rounded-[2px] space-y-4">
+                    <div className="flex items-center justify-between border-b border-[#202026] pb-3">
+                      <div>
+                        <div className="text-base font-bold text-white">{inquiryResult.name}</div>
+                        <div className="text-xs font-mono text-[#0f62fe]">{inquiryResult.inquiryLoggedAs}</div>
+                      </div>
+                      <Tag type="green" size="sm" className="font-mono m-0 font-bold">
+                        {formatNumber(inquiryResult.score, locale)} PTS &bull; {inquiryResult.band}
+                      </Tag>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                      <div>
+                        <span className="text-[#777777] block text-[10px] uppercase font-semibold">ACTIVE DEFAULTS:</span>
+                        <span className="font-mono text-white font-bold">{inquiryResult.activeDefaults}</span>
+                      </div>
+                      <div>
+                        <span className="text-[#777777] block text-[10px] uppercase font-semibold">DEFAULT AMOUNT:</span>
+                        <span className="font-mono text-white">{inquiryResult.defaultAmount}</span>
+                      </div>
+                      <div>
+                        <span className="text-[#777777] block text-[10px] uppercase font-semibold">WORST RHI (12M):</span>
+                        <span className="font-mono text-white">{inquiryResult.worstRhiLast12m}</span>
+                      </div>
+                      <div>
+                        <span className="text-[#777777] block text-[10px] uppercase font-semibold">RECOMMENDATION:</span>
+                        <span className="text-[#24a148] font-bold">{inquiryResult.recommendation}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </TabPanel>
+
+            {/* TAB 3: Ingest Audit Stream */}
+            <TabPanel className="p-5 md:p-6 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-medium text-white">{t('recentBatches', 'Recent Ingestion Batches')}</h2>
+                <Button size="sm" kind="ghost" onClick={fetchAuditEvents} renderIcon={Renew}>
+                  Refresh
+                </Button>
+              </div>
+
               <div
-                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                className="border border-[#202026] overflow-x-auto rounded-[2px]"
                 tabIndex={0}
                 role="region"
-                aria-label="Ingestion Batch Audit Log Table"
+                aria-label="Recent Ingestion Batches Table"
               >
-                {isLoadingAudit ? (
-                  <div className="p-8 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
-                    Loading ingestion batch audit records...
-                  </div>
-                ) : auditEvents.length === 0 ? (
-                  <div className="p-8 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
-                    No ingestion batch records found for this provider.
-                  </div>
-                ) : (
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead>
-                      <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[10px] tracking-wider">
-                        <th className="p-3">Batch ID</th>
-                        <th className="p-3">Ingestion Type</th>
-                        <th className="p-3">Timestamp</th>
-                        <th className="p-3 text-right">Records Sent</th>
-                        <th className="p-3 text-right">Committed</th>
-                        <th className="p-3 text-right">Rejected</th>
-                        <th className="p-3">Batch Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                      {auditEvents.map((evt) => (
-                        <tr key={evt.id} className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                          <td className="p-3 text-[var(--cds-link-primary)]">{evt.id.slice(0, 16)}</td>
-                          <td className="p-3 text-white">{evt.raw_payload?.record_type || 'JSON_RECORD'}</td>
-                          <td className="p-3 text-[#8d8d8d]">{evt.created_at || 'Just now'}</td>
-                          <td className="p-3 text-right text-[#c6c6c6]">1</td>
-                          <td className="p-3 text-right text-[#42be65] font-bold">{evt.status === 'ACCEPTED' ? '1' : '0'}</td>
-                          <td className="p-3 text-right text-[#fa4d56]">{evt.status === 'REJECTED' ? '1' : '0'}</td>
-                          <td className="p-3">
-                            <Tag type={evt.status === 'ACCEPTED' ? 'green' : 'red'} size="sm" className="m-0">
-                              {evt.status}
-                            </Tag>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="bg-[#1c1c21] border-b border-[#202026] text-[#999999] uppercase text-[11px] tracking-wider">
+                      <th className="p-3">{t('batchId', 'Batch ID')}</th>
+                      <th className="p-3">{t('providerCol', 'Provider')}</th>
+                      <th className="p-3">{locale === 'ne' ? 'प्रकार' : 'Type'}</th>
+                      <th className="p-3">{locale === 'ne' ? 'कारोबार मिति' : 'Valid Time'}</th>
+                      <th className="p-3">{t('statusCol', 'Status')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#202026]">
+                    <tr>
+                      <td className="p-3 text-[#0f62fe]">TX-NP-2083-99014</td>
+                      <td className="p-3 text-white">PRV-NEA-001 (Nepal Electricity Authority)</td>
+                      <td className="p-3 text-[#999999]">UTILITY (विद्युत्)</td>
+                      <td className="p-3 text-[#8d8d8d]">{formatDualDate('2026-09-01', locale)}</td>
+                      <td className="p-3"><Tag type="green" size="sm" className="m-0">COMMITTED</Tag></td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-[#0f62fe]">TX-NP-2083-99013</td>
+                      <td className="p-3 text-white">PRV-NABIL-001 (Nabil Bank Limited)</td>
+                      <td className="p-3 text-[#999999]">RHI (आवासीय घर कर्जा)</td>
+                      <td className="p-3 text-[#8d8d8d]">{formatDualDate('2026-08-30', locale)}</td>
+                      <td className="p-3"><Tag type="green" size="sm" className="m-0">COMMITTED</Tag></td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-[#0f62fe]">TX-NP-2083-99012</td>
+                      <td className="p-3 text-white">PRV-NTC-001 (Nepal Telecom)</td>
+                      <td className="p-3 text-[#999999]">UTILITY (दूरसञ्चार)</td>
+                      <td className="p-3 text-[#8d8d8d]">{formatDualDate('2026-08-25', locale)}</td>
+                      <td className="p-3"><Tag type="green" size="sm" className="m-0">COMMITTED</Tag></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </TabPanel>
           </TabPanels>

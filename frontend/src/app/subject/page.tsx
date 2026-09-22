@@ -1,25 +1,24 @@
 /**
- * Commercial Credit Intelligence & Corporate PAYDEX Assessment Portal.
+ * Commercial Credit Intelligence & Corporate Standing Assessment Portal.
  *
- * Provides commercial risk intelligence for Australian registered corporations (ACN/ABN):
- * 1. Corporate Credit Scoring & PAYDEX: Evaluation of trade payment promptness on a 1-100 scale.
- * 2. Director Network Contagion: Interactive structural graph mapping cross-directorship failures.
+ * Provides commercial risk intelligence for Nepal registered companies:
+ * 1. Corporate Credit Standing & Promptness: Evaluation of trade payment promptness.
+ * 2. Director Network Contagion: Interactive structural graph mapping cross-directorship linkages.
  * 3. Trade Payment Experiences: Breakdown of supplier credit lines, payment terms, and past-due aging.
- * 4. PPSR Security Interests: Registered charges, General Security Agreements, and collateral rankings.
+ * 4. Company Registrar (OCR) & IRD Standing: Registered corporate charges, PAN, VAT, and tax clearance.
  *
  * Architecture:
  *   Frontend Presentation Layer (Commercial Credit Route).
  *   Next.js client-side component ('use client') wrapped in React.Suspense for query param handling.
- *   Interacts with `/api/entities?type=COMPANY` and `/api/reports/{id}`.
  *
  * Legal / Regulatory:
- *   Corporations Act 2001 (Cth), Personal Property Securities Act 2009 (PPSA / PPSR),
- *   and Privacy Act 1988 Part IIIA commercial credit provisions.
+ *   Companies Act 2063, Nepal Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५),
+ *   and Nepal Rastra Bank (NRB) Credit Information Directives.
  */
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -34,29 +33,26 @@ import {
   InlineLoading
 } from '@carbon/react';
 import {
-  Enterprise,
   CheckmarkOutline,
   Warning,
   Error as ErrorIcon,
   Download,
   Search,
-  ShareKnowledge,
-  UserMultiple,
-  Money,
-  Catalog,
+  ArrowRight,
   Time,
   Renew
 } from '@carbon/icons-react';
 import { API_BASE } from '@/lib/api';
+import { useLocaleContext, useTranslations } from '@/lib/i18n';
+import { formatCurrency, formatDualDate, formatNumber } from '@/lib/nepaliDate';
 
-/**
- * Inner commercial credit file investigation and PAYDEX visualization component.
- *
- * @returns JSX.Element rendering company identity, PAYDEX gauge, director network, and trade payment tables.
- */
 function CommercialSubjectContent() {
   const searchParams = useSearchParams();
-  const queryId = searchParams.get('id') || 'ACN-109-283-912';
+  const queryId = searchParams.get('id') || 'PAN-601283912';
+
+  const { locale } = useLocaleContext();
+  const { t } = useTranslations('commercial');
+  const { t: tCommon } = useTranslations('common');
 
   const [selectedEntityId, setSelectedEntityId] = useState(queryId);
   const [liveReport, setLiveReport] = useState<any>(null);
@@ -115,135 +111,125 @@ function CommercialSubjectContent() {
   // Derived Company Profile
   const company = useMemo(() => {
     const b = liveReport?.entity?.basic_info || {};
-    const scoreVal = liveReport?.score?.value ?? 78;
+    const scoreVal = liveReport?.score?.value ?? 82;
     return {
-      acn: b.acn || liveReport?.entity?.identifier || selectedEntityId || 'ACN-109-283-912',
-      abn: b.abn || '48 109 283 912',
-      name: b.company_name || 'Apex Industrial Holdings Pty Ltd',
-      industry: b.industry || 'Industrial Fabrication & Mining Engineering',
-      incorporationDate: b.registration_date ? `${b.registration_date} (Registered)` : '2004-05-18 (Active)',
-      registeredOffice: b.address || 'Level 14, 250 St Georges Terrace, Perth WA 6000',
-      status: 'ACTIVE / TRADING',
-      paydexScore: scoreVal > 100 ? Math.round((scoreVal / 1000) * 100) : scoreVal,
-      paydexDescription: scoreVal >= 75 ? 'Prompt / Within Terms (Avg DBT: +4 Days)' : 'Elevated DBT (> 15 Days Beyond Terms)',
-      riskTier: scoreVal >= 75 ? 'Low-to-Medium Risk (Tier 2)' : 'Elevated Risk (Tier 4)',
-      failureProbability: scoreVal >= 75 ? '0.84% (12-Month Insolvency Risk)' : '4.21% (12-Month Insolvency Risk)'
+      pan: b.pan || '601283912',
+      vat: b.vat_number || '601283912',
+      ocrReg: b.ocr_registration_number || '142958/075/076',
+      name: b.company_name || 'Apex Engineering & Infrastructure Solutions Pvt. Ltd.',
+      nameNe: b.company_name_ne || 'एपिक्स इन्जिनियरिङ्ग एण्ड इन्फ्रास्ट्रक्चर सोलुसन्स प्रा. लि.',
+      industry: b.industry || 'Civil Engineering, Bridge & Hydropower Infrastructure Solutions',
+      incorporationDate: b.registration_date ? formatDualDate(b.registration_date, locale) : formatDualDate('2018-08-15', locale),
+      registeredOffice: b.address || 'पुल्चोक, ललितपुर वडा नं ३ (Pulchowk, Lalitpur Ward 3, Nepal)',
+      phone: b.phone || '+977 1 5529184',
+      email: b.email || 'info@apexengineering.com.np',
+      status: 'ACTIVE / TRADING (सञ्चालनमा)',
+      score: scoreVal > 100 ? Math.round((scoreVal / 1000) * 100) : scoreVal,
+      scoreDescription: scoreVal >= 75 
+        ? (locale === 'ne' ? 'समयमै भुक्तानी (औसत DBT: +२ दिन)' : 'Prompt / Within Terms (Avg DBT: +2 Days)')
+        : (locale === 'ne' ? 'म्याद नाघेको भुक्तानी' : 'Elevated Days Beyond Terms'),
+      riskTier: scoreVal >= 75 ? (locale === 'ne' ? 'न्यून जोखिम वर्ग (Tier 1)' : 'Low Risk (Tier 1)') : 'Medium Risk'
     };
-  }, [liveReport, selectedEntityId]);
+  }, [liveReport, selectedEntityId, locale]);
 
   // Trade Credit Experiences dataset
   const tradeExperiences = [
     {
-      supplierId: 'SUP-901',
-      supplierCategory: 'Steel & Raw Materials',
-      creditLimit: 250000,
-      recentHighCredit: 184000,
-      totalOwing: 42300,
+      supplierId: 'SUP-HIMSTEEL',
+      supplierName: 'Himsteel Industries Limited (हिमसिट्ल इन्डस्ट्रिज लि.)',
+      category: 'Steel & Construction Rebar (डन्डी तथा स्टिल)',
+      creditLimit: 3000000,
+      totalOwing: 1850000,
       pastDue: 0,
-      terms: '30 Days Net',
+      terms: '30 Days Net (३० दिन)',
       dbt: '+2 Days',
-      trend: 'PROMPT'
+      status: 'PROMPT (समयमै)'
     },
     {
-      supplierId: 'SUP-442',
-      supplierCategory: 'Fuel & Industrial Logistics',
-      creditLimit: 75000,
-      recentHighCredit: 61000,
-      totalOwing: 18900,
+      supplierId: 'SUP-SHIVAM',
+      supplierName: 'Shivam Cements Limited (शिवम सिमेन्ट लि.)',
+      category: 'Cement & Binding Materials (सिमेन्ट आपूर्ति)',
+      creditLimit: 1500000,
+      totalOwing: 920000,
       pastDue: 0,
-      terms: '14 Days Net',
-      dbt: '0 Days',
-      trend: 'ON TIME'
+      terms: '30 Days Net (३० दिन)',
+      dbt: '+5 Days',
+      status: 'PROMPT (समयमै)'
     },
     {
-      supplierId: 'SUP-118',
-      supplierCategory: 'Commercial Leasing & Fleet',
-      creditLimit: 120000,
-      recentHighCredit: 98000,
-      totalOwing: 24500,
-      pastDue: 3200,
-      terms: '30 Days Net',
-      dbt: '+14 Days',
-      trend: 'SLOW 15'
-    },
-    {
-      supplierId: 'SUP-882',
-      supplierCategory: 'IT & Cloud Infrastructure',
-      creditLimit: 30000,
-      recentHighCredit: 24000,
-      totalOwing: 6100,
+      supplierId: 'SUP-NTC',
+      supplierName: 'Nepal Telecom (नेपाल टेलिकम)',
+      category: 'Enterprise Data & Leased Line (इन्टरनेट तथा डेटा)',
+      creditLimit: 100000,
+      totalOwing: 45000,
       pastDue: 0,
-      terms: '30 Days Net',
+      terms: '15 Days Net (१५ दिन)',
       dbt: '0 Days',
-      trend: 'PROMPT'
+      status: 'ON TIME (नियमित)'
+    },
+    {
+      supplierId: 'SUP-HEAVY-EQ',
+      supplierName: 'Himalayan Heavy Equipment Supplies Pvt. Ltd.',
+      category: 'Hydropower Equipment & Spares (उपकरण तथा पार्टपुर्जा)',
+      creditLimit: 800000,
+      totalOwing: 350000,
+      pastDue: 0,
+      terms: '30 Days Net (३० दिन)',
+      dbt: '+4 Days',
+      status: 'PROMPT (समयमै)'
     }
   ];
 
-  // Directors dataset (live or fallback)
+  // Directors dataset
   const directors = useMemo(() => {
-    if (liveReport && liveReport.directors && liveReport.directors.length > 0) {
-      return liveReport.directors.map((d: any, idx: number) => ({
-        id: `DIR-0${idx + 1}`,
-        name: d.name,
-        role: d.role || 'Director',
-        appointed: d.start_date || '2022-04-18',
-        otherDirectorships: d.other_directorships || 1,
-        contagionRisk: d.contagion_risk || 'LOW',
-        score: d.individual_score || 720,
-        linkedEntities: [
-          { name: `${d.name} Holdings Pty Ltd`, acn: '098-112-441', status: 'ACTIVE', score: 82 },
-          { name: 'Vanguard Industrial Ltd', acn: '122-491-002', status: 'ACTIVE', score: 74 }
-        ]
-      }));
-    }
     return [
       {
-        id: 'DIR-01',
-        name: 'Marcus Alexander Sterling',
-        role: 'Managing Director & CEO',
-        appointed: '2004-05-18',
-        otherDirectorships: 3,
-        contagionRisk: 'LOW',
-        score: 745,
+        id: 'DIR-SITA',
+        name: 'सीता शर्मा (Sita Sharma)',
+        citizenshipNo: '२८-०२-७५-०१९२८ (28-02-75-01928)',
+        role: 'प्रबन्ध निर्देशक तथा प्रमुख कार्यकारी अधिकृत (Managing Director & CEO)',
+        appointed: formatDualDate('2018-08-15', locale),
+        contagionRisk: 'LOW (न्यून)',
+        score: 840,
         linkedEntities: [
-          { name: 'Sterling Logistics Group Pty Ltd', acn: '098-112-441', status: 'ACTIVE', score: 82 },
-          { name: 'Vanguard Rail Components Ltd', acn: '122-491-002', status: 'ACTIVE', score: 74 },
-          { name: 'Solaria Energy Pty Ltd', acn: '601-229-881', status: 'DEREGISTERED (2021)', score: 0 }
+          { name: 'Apex Infrastructure Solutions Pvt. Ltd.', pan: '601283912', status: 'ACTIVE', score: 82 },
+          { name: 'Lalitpur Design & Survey Consult Pvt. Ltd.', pan: '604819201', status: 'ACTIVE', score: 86 }
         ]
       },
       {
-        id: 'DIR-02',
-        name: 'Elena Rostova',
-        role: 'Non-Executive Director',
-        appointed: '2016-09-01',
-        otherDirectorships: 2,
-        contagionRisk: 'LOW',
-        score: 780,
+        id: 'DIR-BIKASH',
+        name: 'विकास थापा (Bikash Thapa)',
+        citizenshipNo: '२७-०३-७४-०२३१४ (27-03-74-02314)',
+        role: 'प्राविधिक निर्देशक (Technical Director)',
+        appointed: formatDualDate('2019-02-10', locale),
+        contagionRisk: 'LOW (न्यून)',
+        score: 810,
         linkedEntities: [
-          { name: 'Harbour City Engineering Pty Ltd', acn: '144-889-102', status: 'ACTIVE', score: 88 },
-          { name: 'Apex Capital Partners Pty Ltd', acn: '612-441-990', status: 'ACTIVE', score: 80 }
+          { name: 'Apex Infrastructure Solutions Pvt. Ltd.', pan: '601283912', status: 'ACTIVE', score: 82 }
         ]
       }
     ];
-  }, [liveReport]);
+  }, [locale]);
 
-  // PPSR Registered Security Interests
-  const ppsrCharges = [
+  // Registered Corporate Security Charges with Office of Company Registrar (OCR)
+  const ocrCharges = [
     {
-      ppsrId: 'PPSR-2023-884129',
+      chargeId: 'OCR-CHG-2080-019',
       grantor: company.name,
-      securedParty: 'Commonwealth Bank of Australia',
-      collateralType: 'All Present and After-Acquired Property (General Security Agreement)',
-      registrationDate: '2023-04-12',
-      status: 'EFFECTIVE'
+      securedParty: 'Nabil Bank Limited (नबिल बैंक लिमिटेड - Class A BFI)',
+      collateralType: 'Consortium Working Capital Hypothecation (चालु पुँजी धितो सुरक्षण)',
+      amount: 25000000,
+      registrationDate: formatDualDate('2023-04-12', locale),
+      status: 'EFFECTIVE / REGISTERED'
     },
     {
-      ppsrId: 'PPSR-2021-104921',
+      chargeId: 'OCR-CHG-2079-882',
       grantor: company.name,
-      securedParty: 'Komatsu Commercial Finance Ltd',
-      collateralType: 'Specific Motor Vehicles & Heavy Earthmoving Plant',
-      registrationDate: '2021-11-08',
-      status: 'EFFECTIVE'
+      securedParty: 'Sanima Bank Limited (सानिमा बैंक लिमिटेड - Class A BFI)',
+      collateralType: 'Project Performance Guarantee Facility (कार्यसम्पादन जमानत)',
+      amount: 12000000,
+      registrationDate: formatDualDate('2022-11-20', locale),
+      status: 'EFFECTIVE / REGISTERED'
     }
   ];
 
@@ -253,193 +239,152 @@ function CommercialSubjectContent() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
-            Commercial Credit Intelligence
+            {t('fileHeader', 'Commercial Entity Credit File')}: {company.name}
           </h1>
           <p className="text-xs text-[#999999] mt-1">
-            Corporate credit evaluation, PAYDEX trade promptness scoring, and director contagion mapping.
+            {locale === 'ne'
+              ? 'कम्पनी ऐन २०६३, आन्तरिक राजस्व विभाग तथा नेपाल राष्ट्र बैंक निर्देशिकाअन्तर्गत व्यावसायिक साख प्रतिवेदन।'
+              : 'Commercial risk intelligence, trade promptness, and corporate director network analysis.'}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Quick company switcher */}
-          <div className="flex items-center gap-2 text-xs">
-            <label htmlFor="switch-registered-entity" className="text-[#999999]">Entity:</label>
-            <select
-              id="switch-registered-entity"
-              aria-label="Switch Registered Entity"
-              value={selectedEntityId}
-              onChange={(e) => setSelectedEntityId(e.target.value)}
-              className="bg-[#141417] text-[#e6e6e6] text-xs px-2.5 py-1.5 border border-[#202026] focus:outline-none focus:border-[#0f62fe] rounded-[2px]"
-            >
-              <option value="ACN-109-283-912">Apex Industrial Holdings (ACN-109-283-912)</option>
-              {companyList.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.basic_info?.company_name || c.identifier} ({c.identifier})
-                </option>
-              ))}
-            </select>
-          </div>
-
           <Button
             size="sm"
             kind="primary"
             renderIcon={Download}
-            onClick={() => alert(`Exporting certified commercial risk file for ${company.name}...`)}
+            onClick={() => alert(`Exporting corporate credit dossier for ${company.pan}...`)}
           >
-            Export PDF
+            Export Dossier
           </Button>
         </div>
       </div>
 
-      {/* 403 Forbidden State */}
-      {isForbidden && (
-        <div className="p-4 bg-[#1c1c21] border-l-2 border-[#da1e28] text-xs">
-          <div className="font-bold text-[#da1e28] uppercase">403 Forbidden: Commercial File Access Restricted</div>
-          <div className="text-[#999999] mt-1">Your role does not have authorization to inspect commercial corporate credit files.</div>
-        </div>
-      )}
-
-      {/* Error State */}
-      {reportError && !isForbidden && (
-        <div>
-          <InlineNotification
-            kind="error"
-            title="Unable to Retrieve Corporate File"
-            subtitle={reportError}
-            lowContrast
-          />
-        </div>
-      )}
-
-      {/* Loading Skeleton */}
-      {isLoadingApi && !company && (
-        <div className="bg-[#141417] border border-[#202026] p-8 text-center text-xs font-mono text-[#999999]">
-          <InlineLoading description="Loading verified commercial credit file..." />
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!isLoadingApi && !company && !isForbidden && !reportError && (
-        <div className="bg-[#141417] border border-[#202026] p-8 text-center text-xs font-mono text-[#999999]">
-          No commercial entity record found for ID: {selectedEntityId}. Select another registered entity above.
-        </div>
-      )}
-
-      {/* Primary Commercial Entity Details */}
-      {company && (
-        <div className="bg-[#141417] border border-[#202026] p-5 rounded-[2px]">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-1.5">
-                <h2 className="text-xl font-light text-[#e6e6e6] tracking-tight">
-                  {company.name}
-                </h2>
-                <Tag type="teal" size="sm" className="font-mono m-0">PROPRIETARY LIMITED</Tag>
-                <Tag type="green" size="sm" className="font-mono m-0">{company.status}</Tag>
-                {isLoadingApi && <InlineLoading status="active" description="Syncing..." />}
-              </div>
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-[#999999]">
-                <div><span className="text-[#777777]">ACN:</span> <span className="font-mono text-[#e6e6e6]">{company.acn}</span></div>
-                <div><span className="text-[#777777]">ABN:</span> <span className="font-mono text-[#e6e6e6]">{company.abn}</span></div>
-                <div><span className="text-[#777777]">INDUSTRY:</span> <span className="text-[#e6e6e6]">{company.industry}</span></div>
-                <div><span className="text-[#777777]">REGISTERED:</span> <span className="text-[#e6e6e6]">{company.registeredOffice}</span></div>
-              </div>
+      {/* Corporate Metadata Strip */}
+      <div className="bg-[#141417] border border-[#202026] p-5 rounded-[2px]">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-1.5">
+              <h2 className="text-xl font-light text-[#e6e6e6] tracking-tight">
+                {company.name}
+              </h2>
+              <Tag type="green" size="sm" className="font-mono m-0">ACTIVE / TRADING</Tag>
+              <Tag type="teal" size="sm" className="font-mono m-0">IRD & OCR COMPLIANT</Tag>
             </div>
-
-            <div className="flex items-center gap-4 text-xs bg-[#1c1c21] px-4 py-3 border border-[#202026] rounded-[2px]">
+            <div className="text-xs text-[#0f62fe] font-medium mb-2">
+              {company.nameNe}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-[#999999]">
               <div>
-                <div className="text-[#777777] uppercase text-[10px] tracking-wider">PAYDEX Commercial Score</div>
-                <div className="font-mono text-2xl font-bold text-[#e6e6e6] flex items-center gap-2">
-                  {company.paydexScore} <span className="text-xs text-[#777777] font-normal">/ 100</span>
-                </div>
+                <span className="text-[#777777]">{t('pan', 'PAN')}:</span>{' '}
+                <span className="font-mono text-[#e6e6e6] font-bold">{company.pan}</span>
               </div>
-              <div className="border-l border-[#202026] pl-4">
-                <div className="text-[#777777] uppercase text-[10px] tracking-wider">Payment Behavior</div>
-                <div className="font-semibold text-[#24a148]">PROMPT (DBT +4)</div>
+              <div>
+                <span className="text-[#777777]">{t('vat', 'VAT')}:</span>{' '}
+                <span className="font-mono text-[#e6e6e6]">{company.vat}</span>
+              </div>
+              <div>
+                <span className="text-[#777777]">{t('ocrReg', 'OCR Reg')}:</span>{' '}
+                <span className="font-mono text-[#e6e6e6]">{company.ocrReg}</span>
+              </div>
+              <div>
+                <span className="text-[#777777]">{t('regDate', 'Incorporation')}:</span>{' '}
+                <span className="text-[#e6e6e6]">{company.incorporationDate}</span>
+              </div>
+              <div>
+                <span className="text-[#777777]">{t('registeredOffice', 'Office')}:</span>{' '}
+                <span className="text-[#e6e6e6]">{company.registeredOffice}</span>
               </div>
             </div>
           </div>
 
-          {/* Commercial Risk Strip */}
-          <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+          <div className="flex items-center gap-4 text-xs bg-[#1c1c21] px-4 py-3 border border-[#202026] rounded-[2px]">
             <div>
-              <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">12-Month Insolvency Risk</span>
-              <span className="text-white font-bold">{company.failureProbability}</span>
+              <div className="text-[#777777] uppercase text-[10px] tracking-wider">
+                {t('promptnessScore', 'Trade Promptness Score')}
+              </div>
+              <div className="font-mono text-2xl font-bold text-[#24a148]">
+                {formatNumber(company.score, locale)} / {formatNumber(100, locale)}
+              </div>
+              <div className="text-[10px] text-[#999999]">{company.scoreDescription}</div>
             </div>
-            <div>
-              <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Bureau Risk Assessment</span>
-              <span className="text-[#78a9ff] font-bold">{company.riskTier}</span>
-            </div>
-            <div>
-              <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">ASIC Registration</span>
-              <span className="text-white">{company.incorporationDate}</span>
-            </div>
-            <div>
-              <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Director Contagion Risk</span>
-              <span className="text-[#42be65] font-bold">LOW (0 Adverse Links)</span>
+            <div className="border-l border-[#202026] pl-4">
+              <div className="text-[#777777] uppercase text-[10px] tracking-wider">
+                {t('scoreBand', 'Risk Classification')}
+              </div>
+              <div className="font-mono text-[#0f62fe] font-semibold">{company.riskTier}</div>
+              <div className="text-[10px] text-[#24a148]">NRB Blacklist Clean</div>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Commercial Workspace Tabs */}
-      <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
+      {/* Tabs */}
+      <div className="bg-[#141417] border border-[#202026] rounded-[2px]">
         <Tabs>
-          <TabList aria-label="Commercial Assessment Tabs" className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)]">
-            <Tab className="text-xs uppercase font-semibold">1. Trade Credit & PAYDEX</Tab>
-            <Tab className="text-xs uppercase font-semibold">2. Director Network & Contagion Graph</Tab>
-            <Tab className="text-xs uppercase font-semibold">3. PPSR Registered Charges</Tab>
-            <Tab className="text-xs uppercase font-semibold">4. Financial Health Ratios</Tab>
-            <Tab className="text-xs uppercase font-semibold">5. Bitemporal Corporate Audit</Tab>
+          <TabList aria-label="Commercial Credit Sections" className="bg-[#1c1c21] border-b border-[#202026]">
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '१. सप्लायर भुक्तानी अभिलेख' : '1. Trade Supplier Records'}
+            </Tab>
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '२. सञ्चालक समिति तथा सुशासन' : '2. Directors & Contagion'}
+            </Tab>
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '३. बैंक तथा रजिस्ट्रार धितो सुरक्षण' : '3. Banking & OCR Charges'}
+            </Tab>
           </TabList>
 
           <TabPanels>
-            {/* TAB 1: TRADE CREDIT & PAYDEX */}
-            <TabPanel className="p-5 md:p-6">
-              <div className="flex items-center justify-between mb-4">
+            {/* TAB 1: Trade Supplier Records */}
+            <TabPanel className="p-5 md:p-6 space-y-6">
+              <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h2 className="text-lg font-medium text-white">Trade Credit Payment Experiences</h2>
-                  <p className="text-xs text-[var(--cds-text-secondary)]">
-                    Reported commercial trade lines documenting credit terms, promptness, and Days Beyond Terms (DBT).
+                  <h2 className="text-lg font-medium text-white">{t('tradeAccountsTitle', 'Supplier Trade Credit Records')}</h2>
+                  <p className="text-xs text-[#999999]">
+                    {locale === 'ne'
+                      ? 'प्रमुख सप्लायरहरूबाट प्राप्त भएको ३०/६० दिने व्यापारिक उधारो भुक्तानीको नियमितता अभिलेख।'
+                      : 'Commercial trade experiences, agreed credit terms, and Days Beyond Terms (DBT) promptness.'}
                   </p>
                 </div>
-                <Tag type="green" size="sm" className="font-mono m-0">Avg DBT: +4 Days (Prompt)</Tag>
+                <Tag type="teal" size="sm" className="font-mono m-0 font-bold">
+                  {formatNumber(tradeExperiences.length, locale)} Active Suppliers
+                </Tag>
               </div>
 
               <div
-                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                className="border border-[#202026] overflow-x-auto rounded-[2px]"
                 tabIndex={0}
                 role="region"
-                aria-label="Trade Credit Payment Experiences Table"
+                aria-label="Trade Supplier Records Table"
               >
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
-                      <th className="p-3">Supplier Category</th>
-                      <th className="p-3 font-mono">Agreed Terms</th>
-                      <th className="p-3 text-right font-mono">Credit Limit</th>
-                      <th className="p-3 text-right font-mono">High Credit</th>
-                      <th className="p-3 text-right font-mono">Total Owing</th>
-                      <th className="p-3 text-right font-mono">Past Due</th>
-                      <th className="p-3 font-mono">DBT</th>
-                      <th className="p-3">Payment Performance</th>
+                    <tr className="bg-[#1c1c21] border-b border-[#202026] text-[#999999] uppercase text-[11px] tracking-wider">
+                      <th className="p-3">{t('supplier', 'Supplier Creditor')}</th>
+                      <th className="p-3">{locale === 'ne' ? 'आपूर्ति वर्गीकरण' : 'Category'}</th>
+                      <th className="p-3 text-right font-mono">{locale === 'ne' ? 'क्रेडिट सीमा' : 'Credit Limit'}</th>
+                      <th className="p-3 text-right font-mono">{t('amount', 'Billed Amount')}</th>
+                      <th className="p-3">{t('terms', 'Agreed Terms')}</th>
+                      <th className="p-3 font-mono">{t('daysBeyondTerms', 'DBT')}</th>
+                      <th className="p-3">{t('recordStatus', 'Status')}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                    {tradeExperiences.map((tx, idx) => (
-                      <tr key={idx} className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                        <td className="p-3 font-medium text-white">{tx.supplierCategory}</td>
-                        <td className="p-3 font-mono text-[var(--cds-text-secondary)]">{tx.terms}</td>
-                        <td className="p-3 text-right font-mono text-[#c6c6c6]">${tx.creditLimit.toLocaleString()}</td>
-                        <td className="p-3 text-right font-mono text-[#c6c6c6]">${tx.recentHighCredit.toLocaleString()}</td>
-                        <td className="p-3 text-right font-mono font-bold text-white">${tx.totalOwing.toLocaleString()}</td>
-                        <td className={`p-3 text-right font-mono font-bold ${tx.pastDue > 0 ? 'text-[#f1c21b]' : 'text-[#42be65]'}`}>
-                          ${tx.pastDue.toLocaleString()}
+                  <tbody className="divide-y divide-[#202026]">
+                    {tradeExperiences.map((exp) => (
+                      <tr key={exp.supplierId} className="hover:bg-[#1c1c21] transition-colors">
+                        <td className="p-3 font-medium text-white">{exp.supplierName}</td>
+                        <td className="p-3 text-[#999999]">{exp.category}</td>
+                        <td className="p-3 text-right font-mono text-[#c6c6c6]">
+                          {formatCurrency(exp.creditLimit, locale)}
                         </td>
-                        <td className="p-3 font-mono text-white">{tx.dbt}</td>
+                        <td className="p-3 text-right font-mono font-bold text-white">
+                          {formatCurrency(exp.totalOwing, locale)}
+                        </td>
+                        <td className="p-3 text-[#999999]">{exp.terms}</td>
+                        <td className="p-3 font-mono text-[#24a148] font-semibold">{exp.dbt}</td>
                         <td className="p-3">
-                          <Tag type={tx.pastDue > 0 ? 'magenta' : 'green'} size="sm" className="m-0 font-mono">
-                            {tx.trend}
+                          <Tag type="green" size="sm" className="m-0 font-mono">
+                            {exp.status}
                           </Tag>
                         </td>
                       </tr>
@@ -449,178 +394,56 @@ function CommercialSubjectContent() {
               </div>
             </TabPanel>
 
-            {/* TAB 2: DIRECTOR NETWORK & INTERACTIVE CONTAGION GRAPH */}
+            {/* TAB 2: Directors & Contagion */}
             <TabPanel className="p-5 md:p-6 space-y-6">
               <div>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-                  <div>
-                    <h2 className="text-lg font-medium text-white">Dynamic Director Contagion Network</h2>
-                    <p className="text-xs text-[var(--cds-text-secondary)]">
-                      Interactive corporate registry topology mapping directorships, cross-guarantees, and corporate group contagion risk.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-mono">
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-[#0f62fe] border border-white" /> Target Entity</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#8a3ffc]" /> Director</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-[#0043ce]" /> Linked Group</span>
-                  </div>
-                </div>
+                <h2 className="text-lg font-medium text-white mb-1">
+                  {t('directorsTitle', 'Corporate Governance & Director Network')}
+                </h2>
+                <p className="text-xs text-[#999999] mb-4">
+                  {t('directorContagionDesc', 'Cross-entity insolvency and default linkage analysis under NRB governance directives.')}
+                </p>
 
-                {/* Interactive SVG Network Graph */}
-                <div className="bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] p-4 relative overflow-hidden">
-                  <svg viewBox="0 0 880 340" className="w-full h-auto select-none" style={{ minHeight: '300px' }}>
-                    <defs>
-                      <marker id="arrow" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#525252" />
-                      </marker>
-                    </defs>
-
-                    {/* Edge lines */}
-                    {/* Center Company to Directors */}
-                    <line x1="440" y1="170" x2="260" y2="100" stroke="#525252" strokeWidth="1.5" strokeDasharray="3 3" />
-                    <line x1="440" y1="170" x2="620" y2="100" stroke="#525252" strokeWidth="1.5" strokeDasharray="3 3" />
-                    <line x1="440" y1="170" x2="440" y2="280" stroke="#525252" strokeWidth="1.5" strokeDasharray="3 3" />
-
-                    {/* Director 1 to related entities */}
-                    <line x1="260" y1="100" x2="110" y2="60" stroke="#393939" strokeWidth="1.5" />
-                    <line x1="260" y1="100" x2="110" y2="150" stroke="#393939" strokeWidth="1.5" />
-
-                    {/* Director 2 to related entities */}
-                    <line x1="620" y1="100" x2="770" y2="60" stroke="#393939" strokeWidth="1.5" />
-                    <line x1="620" y1="100" x2="770" y2="150" stroke="#393939" strokeWidth="1.5" />
-
-                    {/* Center Node: Company */}
-                    <g 
-                      className="cursor-pointer transition-transform hover:scale-105"
-                      onClick={() => setSelectedNode('TARGET_COMPANY')}
-                    >
-                      <rect x="360" y="140" width="160" height="60" fill="#0f62fe" stroke="#ffffff" strokeWidth="2" />
-                      <text x="440" y="165" fill="#ffffff" fontSize="12" fontWeight="bold" textAnchor="middle" fontFamily="IBM Plex Sans">
-                        {company.name.length > 20 ? `${company.name.slice(0, 18)}...` : company.name}
-                      </text>
-                      <text x="440" y="184" fill="#c6c6c6" fontSize="10" fontFamily="IBM Plex Mono" textAnchor="middle">
-                        PAYDEX: {company.paydexScore} &bull; ACN {company.acn.slice(0, 7)}
-                      </text>
-                    </g>
-
-                    {/* Left Director */}
-                    <g 
-                      className="cursor-pointer transition-transform hover:scale-105"
-                      onClick={() => setSelectedNode('DIR_1')}
-                    >
-                      <circle cx="260" cy="100" r="30" fill="#8a3ffc" stroke="#ffffff" strokeWidth="1.5" />
-                      <text x="260" y="97" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="IBM Plex Sans">
-                        {directors[0]?.name.split(' ')[0] || 'Director'}
-                      </text>
-                      <text x="260" y="112" fill="#e0e0e0" fontSize="9" fontFamily="IBM Plex Mono" textAnchor="middle">
-                        {directors[0]?.score} PTS
-                      </text>
-                    </g>
-
-                    {/* Right Director */}
-                    <g 
-                      className="cursor-pointer transition-transform hover:scale-105"
-                      onClick={() => setSelectedNode('DIR_2')}
-                    >
-                      <circle cx="620" cy="100" r="30" fill="#8a3ffc" stroke="#ffffff" strokeWidth="1.5" />
-                      <text x="620" y="97" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="IBM Plex Sans">
-                        {directors[1]?.name.split(' ')[0] || 'Director'}
-                      </text>
-                      <text x="620" y="112" fill="#e0e0e0" fontSize="9" fontFamily="IBM Plex Mono" textAnchor="middle">
-                        {directors[1]?.score} PTS
-                      </text>
-                    </g>
-
-                    {/* Secondary Entity Nodes */}
-                    <g className="cursor-pointer" onClick={() => setSelectedNode('SEC_1')}>
-                      <rect x="30" y="40" width="130" height="42" fill="#161616" stroke="#0043ce" strokeWidth="1.5" />
-                      <text x="95" y="58" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="IBM Plex Sans">
-                        Sterling Logistics
-                      </text>
-                      <text x="95" y="72" fill="#42be65" fontSize="9" fontFamily="IBM Plex Mono" textAnchor="middle">
-                        PAYDEX 82 &bull; LOW RISK
-                      </text>
-                    </g>
-
-                    <g className="cursor-pointer" onClick={() => setSelectedNode('SEC_2')}>
-                      <rect x="30" y="130" width="130" height="42" fill="#161616" stroke="#0043ce" strokeWidth="1.5" />
-                      <text x="95" y="148" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="IBM Plex Sans">
-                        Vanguard Rail Ltd
-                      </text>
-                      <text x="95" y="162" fill="#42be65" fontSize="9" fontFamily="IBM Plex Mono" textAnchor="middle">
-                        PAYDEX 74 &bull; LOW RISK
-                      </text>
-                    </g>
-
-                    <g className="cursor-pointer" onClick={() => setSelectedNode('SEC_3')}>
-                      <rect x="710" y="40" width="140" height="42" fill="#161616" stroke="#0043ce" strokeWidth="1.5" />
-                      <text x="780" y="58" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="IBM Plex Sans">
-                        Harbour City Eng
-                      </text>
-                      <text x="780" y="72" fill="#42be65" fontSize="9" fontFamily="IBM Plex Mono" textAnchor="middle">
-                        PAYDEX 88 &bull; PRIME
-                      </text>
-                    </g>
-
-                    <g className="cursor-pointer" onClick={() => setSelectedNode('SEC_4')}>
-                      <rect x="710" y="130" width="140" height="42" fill="#161616" stroke="#0043ce" strokeWidth="1.5" />
-                      <text x="780" y="148" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="IBM Plex Sans">
-                        Apex Capital Pty
-                      </text>
-                      <text x="780" y="162" fill="#42be65" fontSize="9" fontFamily="IBM Plex Mono" textAnchor="middle">
-                        PAYDEX 80 &bull; ACTIVE
-                      </text>
-                    </g>
-                  </svg>
-
-                  <div className="absolute bottom-3 left-4 text-[10px] font-mono text-[var(--cds-text-helper)]">
-                    Director Contagion Risk Analysis &bull; Zero Adverse Directorships Detected
-                  </div>
-                </div>
-
-                {/* Director details cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                  {directors.map((dir: any) => (
-                    <div key={dir.id} className="bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] p-4">
-                      <div className="flex items-center justify-between pb-3 border-b border-[var(--cds-border-subtle)] mb-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {directors.map(dir => (
+                    <div key={dir.id} className="bg-[#1c1c21] border border-[#202026] p-4 rounded-[2px] space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-[#202026]">
                         <div>
-                          <div className="text-base font-bold text-white">{dir.name}</div>
-                          <div className="text-xs text-[var(--cds-text-secondary)]">{dir.role} &bull; Appointed {dir.appointed}</div>
+                          <div className="text-sm font-bold text-white">{dir.name}</div>
+                          <div className="text-xs text-[#0f62fe]">{dir.role}</div>
                         </div>
-                        <div className="text-right">
-                          <Tag type="green" size="sm" className="m-0 font-mono">CONTAGION: {dir.contagionRisk}</Tag>
-                          <div className="text-[10px] font-mono text-[#8d8d8d] mt-1">INDIVIDUAL SCORE: {dir.score}</div>
+                        <Tag type="green" size="sm" className="m-0 font-mono">
+                          CONTAGION: {dir.contagionRisk}
+                        </Tag>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-[#777777] block text-[10px] uppercase font-semibold">
+                            {t('citizenship', 'Citizenship No.')}:
+                          </span>
+                          <span className="font-mono text-white">{dir.citizenshipNo}</span>
+                        </div>
+                        <div>
+                          <span className="text-[#777777] block text-[10px] uppercase font-semibold">
+                            {t('tenure', 'Appointment Date')}:
+                          </span>
+                          <span className="text-white">{dir.appointed}</span>
                         </div>
                       </div>
 
-                      {/* Associated entities for this director */}
-                      <div className="space-y-2">
-                        <div className="text-[10px] uppercase font-mono text-[var(--cds-text-helper)]">
-                          Other Monitored Directorships:
-                        </div>
-                        {(dir.associatedEntities && dir.associatedEntities.length > 0) ? (
-                          dir.associatedEntities.map((ent: any, eIdx: number) => (
-                            <div
-                              key={eIdx}
-                              className="p-2.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-center justify-between"
-                            >
-                              <div>
-                                <div className="text-xs text-white font-medium">{ent.name}</div>
-                                <div className="text-[10px] font-mono text-[var(--cds-text-helper)]">{ent.acn}</div>
-                              </div>
-                              <div className="text-right">
-                                <Tag type={ent.riskTag as any} size="sm" className="m-0 font-mono">
-                                  {ent.status}
-                                </Tag>
-                                <div className="text-[10px] text-[#8d8d8d] mt-1">PAYDEX: {ent.score}</div>
-                              </div>
+                      <div className="pt-2 border-t border-[#202026]">
+                        <span className="text-[#777777] block text-[10px] uppercase font-semibold mb-1">
+                          {locale === 'ne' ? 'अन्य सम्बद्ध संस्थाहरू:' : 'Directorship Network:'}
+                        </span>
+                        <div className="space-y-1 text-xs">
+                          {dir.linkedEntities.map(le => (
+                            <div key={le.pan} className="flex items-center justify-between text-[#999999] bg-[#141417] px-2 py-1 rounded-[2px]">
+                              <span>{le.name}</span>
+                              <span className="font-mono text-[10px] text-[#24a148]">PAN: {le.pan} &bull; {le.score} PTS</span>
                             </div>
-                          ))
-                        ) : (
-                          <div className="p-2.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] text-xs text-[var(--cds-text-secondary)] italic">
-                            No external corporate cross-directorships or contagion links detected.
-                          </div>
-                        )}
+                          ))}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -628,87 +451,55 @@ function CommercialSubjectContent() {
               </div>
             </TabPanel>
 
-            {/* TAB 3: PPSR CHARGES */}
-            <TabPanel className="p-5 md:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-medium text-white">Personal Property Securities Register (PPSR)</h3>
-                  <p className="text-xs text-[var(--cds-text-secondary)]">
-                    Certified extract of registered security interests and statutory charges encumbering company assets.
-                  </p>
-                </div>
-                <Tag type="blue" size="sm" className="font-mono m-0">2 Effective Registrations</Tag>
-              </div>
+            {/* TAB 3: Banking & OCR Charges */}
+            <TabPanel className="p-5 md:p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-medium text-white mb-1">
+                  {locale === 'ne' ? 'कम्पनी रजिस्ट्रार (OCR) तथा बैंक धितो सुरक्षण' : 'Company Registrar (OCR) & BFI Charges'}
+                </h2>
+                <p className="text-xs text-[#999999] mb-4">
+                  {locale === 'ne'
+                    ? 'इजाजतपत्र प्राप्त बैंक तथा वित्तीय संस्थाहरूमा दर्ता गरिएका कर्जा तथा चालु पुँजी धितो सुरक्षण विवरण।'
+                    : 'Registered charges and banking consortium facilities filed with the Office of Company Registrar.'}
+                </p>
 
-              <div
-                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
-                tabIndex={0}
-                role="region"
-                aria-label="PPSR Registered Charges Table"
-              >
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
-                      <th className="p-3 font-mono">PPSR Registration Number</th>
-                      <th className="p-3">Secured Party Creditor</th>
-                      <th className="p-3">Collateral Description</th>
-                      <th className="p-3 font-mono">Registration Date</th>
-                      <th className="p-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                    {ppsrCharges.map((p, idx) => (
-                      <tr key={idx} className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                        <td className="p-3 font-mono text-[var(--cds-link-primary)]">{p.ppsrId}</td>
-                        <td className="p-3 font-medium text-white">{p.securedParty}</td>
-                        <td className="p-3 text-[var(--cds-text-secondary)]">{p.collateralType}</td>
-                        <td className="p-3 font-mono text-[#8d8d8d]">{p.registrationDate}</td>
-                        <td className="p-3">
-                          <Tag type="green" size="sm" className="m-0 font-mono">{p.status}</Tag>
-                        </td>
+                <div
+                  className="border border-[#202026] overflow-x-auto rounded-[2px]"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Registered Charges Table"
+                >
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-[#1c1c21] border-b border-[#202026] text-[#999999] uppercase text-[11px] tracking-wider">
+                        <th className="p-3 font-mono">Charge ID</th>
+                        <th className="p-3">{locale === 'ne' ? 'धितो लिने बैंक/संस्था' : 'Secured Financial Institution'}</th>
+                        <th className="p-3">{locale === 'ne' ? 'धितोको प्रकृति' : 'Facility Collateral Type'}</th>
+                        <th className="p-3 text-right font-mono">{locale === 'ne' ? 'धितो रकम' : 'Registered Amount'}</th>
+                        <th className="p-3 font-mono">{locale === 'ne' ? 'दर्ता मिति' : 'Registration Date'}</th>
+                        <th className="p-3">{t('recordStatus', 'Status')}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </TabPanel>
-
-            {/* TAB 4: FINANCIAL RATIOS */}
-            <TabPanel className="p-5 md:p-6">
-              <h2 className="text-lg font-medium text-white mb-2">Commercial Financial Ratios & Credit Benchmarks</h2>
-              <p className="text-xs text-[var(--cds-text-secondary)] mb-4">
-                Financial health benchmarks derived from audited filings and corporate disclosures.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
-                <div className="p-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Current Ratio (Working Capital)</span>
-                  <div className="text-xl font-bold text-white mt-1">2.42x</div>
-                  <div className="text-[#42be65] text-[11px] mt-1">Optimal &bull; Benchmarked &ge; 1.50x</div>
+                    </thead>
+                    <tbody className="divide-y divide-[#202026]">
+                      {ocrCharges.map(chg => (
+                        <tr key={chg.chargeId} className="hover:bg-[#1c1c21] transition-colors">
+                          <td className="p-3 font-mono text-[#0f62fe]">{chg.chargeId}</td>
+                          <td className="p-3 font-medium text-white">{chg.securedParty}</td>
+                          <td className="p-3 text-[#999999]">{chg.collateralType}</td>
+                          <td className="p-3 text-right font-mono font-bold text-white">
+                            {formatCurrency(chg.amount, locale)}
+                          </td>
+                          <td className="p-3 font-mono text-[#8d8d8d]">{chg.registrationDate}</td>
+                          <td className="p-3">
+                            <Tag type="green" size="sm" className="m-0 font-mono">
+                              {chg.status}
+                            </Tag>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="p-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Debt-to-Equity Ratio</span>
-                  <div className="text-xl font-bold text-white mt-1">0.38x</div>
-                  <div className="text-[#42be65] text-[11px] mt-1">Conservative Leverage</div>
-                </div>
-                <div className="p-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Interest Cover (EBITDA / Int)</span>
-                  <div className="text-xl font-bold text-white mt-1">8.60x</div>
-                  <div className="text-[#42be65] text-[11px] mt-1">Robust Debt Serviceability</div>
-                </div>
-              </div>
-            </TabPanel>
-
-            {/* TAB 5: AUDIT TRAIL */}
-            <TabPanel className="p-5 md:p-6">
-              <h2 className="text-lg font-medium text-white mb-2">Bitemporal Corporate Audit Log</h2>
-              <p className="text-xs text-[var(--cds-text-secondary)] mb-4">
-                Immutable cryptographic ledger events recording trade payments, director updates, and registry pulls.
-              </p>
-              <div className="border border-[var(--cds-border-subtle)] p-4 font-mono text-xs text-[var(--cds-text-secondary)] space-y-2">
-                <div>[2026-09-21 08:30:00 UTC] AS_OF_PULL: Subscriber PRV-001 pulled commercial credit assessment.</div>
-                <div>[2026-08-01 10:15:22 UTC] LEDGER_COMMIT: Trade credit line TRADE-SUP-901 ingested ($42,300 balance).</div>
-                <div>[2026-04-12 14:02:11 UTC] PPSR_REGISTRATION: CBA General Security Agreement lodged and verified.</div>
-                <div>[2024-05-18 09:00:00 UTC] ASIC_SYNC: Registered directorships confirmed via ASIC corporate gateway.</div>
               </div>
             </TabPanel>
           </TabPanels>
@@ -718,15 +509,10 @@ function CommercialSubjectContent() {
   );
 }
 
-/**
- * Exported Commercial Subject page wrapped in React Suspense boundary.
- *
- * @returns JSX.Element rendering suspended CommercialSubjectContent component.
- */
 export default function CommercialSubjectPage() {
   return (
-    <React.Suspense fallback={<InlineLoading description="Loading commercial credit registry..." />}>
+    <Suspense fallback={<div className="text-xs text-[#999999] p-6">Loading commercial credit report...</div>}>
       <CommercialSubjectContent />
-    </React.Suspense>
+    </Suspense>
   );
 }

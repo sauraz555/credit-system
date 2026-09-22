@@ -16,6 +16,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
+import { I18nProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "Credit Reporting Mechanism",
@@ -42,14 +43,20 @@ export default function RootLayout({
   return (
     <html lang="en" data-carbon-theme="g100">
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Mukta:wght@300;400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
         <link rel="stylesheet" href="/carbon.css" />
-        <link rel="stylesheet" href="https://1.www.s81c.com/common/carbon/plex/sans.css" />
-        <link rel="stylesheet" href="https://1.www.s81c.com/common/carbon/plex/mono.css" />
       </head>
       <body className="bg-[#0b0b0d] text-[#e6e6e6]">
-        <AppShell>
-          {children}
-        </AppShell>
+        <I18nProvider>
+          <AppShell>
+            {children}
+          </AppShell>
+        </I18nProvider>
       </body>
     </html>
   );

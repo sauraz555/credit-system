@@ -1,9 +1,9 @@
 """Credit Data Ingestion and Provider Licensing Validation API Router.
 
 This router serves as the primary data intake gateway for credit providers submitting
-consumer and commercial credit events. It enforces Australian regulatory licensing
-prerequisites (e.g. verifying that only licensed ADI or ACL institutions submit Repayment
-History Information), validates statutory default criteria (Privacy Act Section 6Q),
+consumer and commercial credit events. It enforces Nepal regulatory licensing
+prerequisites (e.g. verifying that only NRB-licensed Class A/B/C/D Bank and Financial Institutions
+submit loan Repayment History Information), validates statutory default criteria under NRB Directives,
 persists records to the bitemporal ledger, writes append-only forensic event logs (`IngestEvent`),
 and maintains strict tenant isolation preventing providers from submitting data under foreign IDs.
 
@@ -16,11 +16,11 @@ Key Dependencies & Callers:
       and bureau administrators.
 
 Regulatory & Compliance Context:
-    - Privacy Act 1988 (Cth) Part IIIA Section 20E:
-      Strictly prohibits non-licensees from contributing Repayment History Information (RHI).
-      Submissions require an Authorized Deposit-taking Institution (ADI) or Australian Credit Licence (ACL).
-    - Privacy Act 1988 Section 6Q:
-      Enforces minimum overdue debt ($150), age (>= 60 days), and notice prerequisites for listing defaults.
+    - Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५):
+      Enforces lawful consent, transparency, and borrower data integrity.
+    - Nepal Rastra Bank (NRB) Directives on Credit Information & BFIs:
+      Restricts loan repayment data submission to licensed Class A, B, C, D BFIs.
+      Utilities (NEA, KUKL, Telecom) are authorized for utility bill tracks and utility arrears.
 """
 
 import csv
@@ -44,7 +44,7 @@ def process_record(record_in: IngestRecordRequest, provider_id: str, db: Session
     """Validates statutory licensing rules and writes an event to the ledger.
 
     Checks that the provider is registered and authorized to submit the requested record type.
-    For RHI records, validates that the provider holds an ADI or ACL license.
+    For loan repayment records, validates that the provider holds an NRB BFI license (Class A/B/C/D).
     Resolves the entity using blind index lookup, logs an append-only IngestEvent,
     and creates the corresponding CreditLedger record.
 
@@ -54,11 +54,16 @@ def process_record(record_in: IngestRecordRequest, provider_id: str, db: Session
         db: Scoped SQLAlchemy database session.
 
     Raises:
-        ValueError: If provider is unregistered, unlicensed for this data type, or lacks an ADI/ACL for RHI.
+        ValueError: If provider is unregistered, unlicensed for this data type, or lacks an NRB BFI license for loan RHI.
     """
     # 0. Check provider licensing and permitted data types
     provider = db.query(Provider).filter(Provider.id == provider_id).first()
-    if not provider and provider_id not in ["PROVIDER_CREDIT_CORP", "PRV-NAB-001", "PRV-CBA-001"]:
+    allowed_default_providers = [
+        "PRV-NABIL-001", "PRV-SANIMA-001", "PRV-MUKTI-001",
+        "PRV-NEA-001", "PRV-KUKL-001", "PRV-NTC-001", "PRV-NCELL-001", "PRV-NRB-CIC-001",
+        "PROVIDER_CREDIT_CORP", "PRV-NAB-001", "PRV-CBA-001"
+    ]
+    if not provider and provider_id not in allowed_default_providers:
         raise ValueError(f"Unregistered provider '{provider_id}'. Submissions require a licensed provider.")
         
     if provider:
@@ -67,12 +72,13 @@ def process_record(record_in: IngestRecordRequest, provider_id: str, db: Session
         if rec_type_val not in permitted:
             raise ValueError(f"Provider '{provider_id}' is not licensed to submit record type '{rec_type_val}'. Permitted: {permitted}")
         
-        # REVIEW-LEGAL: Privacy Act 1988 Part IIIA: RHI strictly restricted to licensed credit providers (ADI, ACL, ELIGIBLE_LENDER)
-        # Commercial or utility providers submitting RHI must be rejected
+        # Under Nepal Rastra Bank Directives:
+        # Loan repayment history (RHI-equivalent) is strictly restricted to licensed BFIs (Class A, B, C, D)
+        # Utilities and telecoms submitting banking RHI must be rejected
         if rec_type_val == "RHI":
-            eligible_licences = ["ADI", "ACL", "ELIGIBLE_LENDER"]
+            eligible_licences = ["CLASS_A_BFI", "CLASS_B_BFI", "CLASS_C_BFI", "CLASS_D_BFI", "NRB_BFI", "ADI", "ACL", "ELIGIBLE_LENDER"]
             if provider.licence_type.upper() not in eligible_licences:
-                raise ValueError(f"RHI submission rejected: Provider '{provider_id}' licence '{provider.licence_type}' is not an eligible lender (must hold ADI or ACL).")
+                raise ValueError(f"RHI submission rejected: Provider '{provider_id}' licence '{provider.licence_type}' is not an NRB-licensed BFI. Only regulated BFIs may submit monthly loan payment records.")
 
     # Resolve entity_id using direct id, blind index, or identifier
     entity = db.query(Entity).filter(

@@ -75,8 +75,12 @@ class ModelCreate(BaseModel):
             total = sum(float(w) for w in v.values())
         except (ValueError, TypeError):
             raise ValueError("All weight values must be numeric")
-        # REVIEW-ASSUMPTION: Tolerance of 0.001 accounts for floating-point rounding
-        if abs(total - 100.0) > 0.001:
+        # Support normalized decimal weights (sum = 1.0) or percentage weights (sum = 100.0)
+        if abs(total - 1.0) <= 0.002:
+            v = {k: round(float(val) * 100.0, 4) for k, val in v.items()}
+            total = 100.0
+        # REVIEW-ASSUMPTION: Tolerance of 0.01 accounts for floating-point rounding
+        if abs(total - 100.0) > 0.01:
             raise ValueError(f"Model weights must total exactly 100%. Current total: {total}%")
         return v
 

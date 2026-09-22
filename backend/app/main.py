@@ -15,7 +15,7 @@ Key Dependencies & Callers:
     - Aggregates `auth_router`, `ingest`, `reports`, `admin`, and `disputes` sub-routers.
 
 Regulatory & Compliance Context:
-    - Privacy Act 1988 (Cth) Part IIIA & Privacy (Credit Reporting) Code 2014:
+    - Nepal Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५) & Nepal Rastra Bank Directives:
       Governs access controls, audited operations, and data isolation enforced throughout the API.
 """
 
@@ -46,7 +46,7 @@ if SENTRY_DSN:
 app = FastAPI(
     title="Credit Reporting Mechanism API (CRMS)",
     version="1.0.0",
-    description="Enterprise Credit Scoring & Bitemporal Reporting Platform per Privacy Act 1988 Part IIIA and Privacy (Credit Reporting) Code 2014"
+    description="Credit Reporting Mechanism & Bitemporal Platform per Nepal Individual Privacy Act 2018 and NRB Directives"
 )
 
 # REVIEW-SECURITY: Explicit origins from environment (strictly non-wildcard).

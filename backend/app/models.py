@@ -15,9 +15,12 @@ Key Dependencies & Callers:
       and analytical services (`scoring.py`, `features.py`).
 
 Regulatory & Compliance Context:
-    - Privacy Act 1988 (Cth) Part IIIA & Privacy (Credit Reporting) Code 2014:
-      Enforces data classification (RHI, Default, SCI), provider licensing eligibility,
-      statutory dispute handling (Section 20V), and retention limits.
+    - Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५):
+      Enforces personal data protection, consent mechanisms, subject access rights,
+      and statutory dispute correction workflows.
+    - Nepal Rastra Bank (NRB) Credit Information Directives:
+      Governs credit information reporting, Blacklist (कालोसूची) criteria, and
+      mandatory reporting eligibility across regulated Bank and Financial Institutions (BFIs).
 """
 
 import enum
@@ -54,30 +57,38 @@ class RoleEnum(str, enum.Enum):
 
 
 class EntityTypeEnum(str, enum.Enum):
-    """Classification of credit subjects under Australian credit law.
+    """Classification of credit subjects under Nepal regulatory framework.
 
     Attributes:
-        INDIVIDUAL: Natural person subject to Privacy Act 1988 (Cth) Part IIIA consumer rules.
-        COMPANY: Incorporated body subject to commercial credit reporting and director linkage.
+        INDIVIDUAL: Natural person identified by Citizenship Number (नागरिकता नं.) or National ID (राष्ट्रिय परिचयपत्र).
+        COMPANY: Incorporated body registered with Office of Company Registrar (OCR) and Inland Revenue Department (PAN/VAT).
     """
     INDIVIDUAL = "INDIVIDUAL"
     COMPANY = "COMPANY"
 
 
 class RecordTypeEnum(str, enum.Enum):
-    """Statutory credit record classifications under Privacy Act 1988 Part IIIA.
+    """Credit record classifications under Nepal credit reporting and regulatory framework.
 
     Attributes:
-        RHI: Repayment History Information (24-month rolling payment statuses 0-6).
-        DEFAULT: Payment default (overdue >= $150 and >= 60 days).
-        SCI: Serious Credit Infringement (fraud or intentional credit evasion).
-        WRIT: Court writs and legal summons.
-        BANKRUPTCY: Insolvency, Part IX debt agreements, and Part X arrangements.
-        HARDSHIP: Financial hardship arrangement information (Codes A and V under Section 6QA).
-        ENQUIRY: Credit application enquiry recorded by a participating credit provider.
-        TRADE_PAYMENT: Commercial trade invoice settlement record (PAYDEX calculation).
+        RHI: Repayment History Information (24-month rolling payment statuses 0-6 submitted by licensed BFIs).
+        UTILITY: Utility payment history (NEA electricity, KUKL water, NTC/Ncell telecom).
+        RENTAL: Residential or commercial tenancy payment records.
+        TAX_COMPLIANCE: Inland Revenue Department (IRD) PAN and tax clearance records.
+        BLACKLIST: Nepal Rastra Bank / Credit Information Centre Blacklist (कालोसूची).
+        DEFAULT: Payment default or overdue facility.
+        SCI: Serious Credit Infringement (fraudulent activity or willful non-payment).
+        WRIT: Court judgments and statutory debt enforcement writs.
+        BANKRUPTCY: Insolvency and liquidation proceedings.
+        HARDSHIP: Restructured loan or debt relief arrangement under NRB directives.
+        ENQUIRY: Credit application enquiry logged by a participating institution.
+        TRADE_PAYMENT: Commercial trade invoice settlement record.
     """
     RHI = "RHI"
+    UTILITY = "UTILITY"
+    RENTAL = "RENTAL"
+    TAX_COMPLIANCE = "TAX_COMPLIANCE"
+    BLACKLIST = "BLACKLIST"
     DEFAULT = "DEFAULT"
     SCI = "SCI"
     WRIT = "WRIT"
@@ -138,24 +149,26 @@ class User(Base):
 class Provider(Base):
     """Licensed Credit Provider entity recording regulatory permissions.
 
-    Under Privacy Act 1988 Part IIIA, only eligible credit providers (such as ADIs
-    or ACL holders) are permitted to submit and access Repayment History Information (RHI).
+    Under Nepal Rastra Bank directives and the Individual Privacy Act 2018, only eligible
+    regulated Bank and Financial Institutions (Class A/B/C/D BFIs) are permitted to submit
+    and access loan Repayment History Information (RHI). Utilities and telecoms may submit
+    utility payment data.
 
     Attributes:
-        id: Unique provider code (e.g., 'PRV-CBA-001').
-        name: Commercial institution name.
-        licence_type: Regulatory license class (ADI, ACL, TELECOM, UTILITY, COMMERCIAL).
+        id: Unique provider code (e.g., 'PRV-NABIL-001', 'PRV-NEA-001').
+        name: Institution name (e.g., Nabil Bank Limited, Nepal Electricity Authority).
+        licence_type: Regulatory license class (CLASS_A_BFI, CLASS_B_BFI, CLASS_C_BFI, CLASS_D_BFI, UTILITY, TELECOM, CENTRAL_BANK).
         permitted_data_types: List of permitted RecordTypeEnum strings for ingestion.
         is_active: Whether the provider's bureau ingestion access is currently authorized.
         created_at: Timestamp of provider registration.
     """
     __tablename__ = "providers"
     
-    id = Column(String, primary_key=True) # e.g. PRV-CBA-001
+    id = Column(String, primary_key=True) # e.g. PRV-NABIL-001
     name = Column(String, nullable=False)
-    # REVIEW-LEGAL: Licence type governs RHI eligibility under Privacy Act 1988 s20E.
-    licence_type = Column(String, nullable=False) # e.g. ADI, ACL, TELECOM, UTILITY, COMMERCIAL
-    permitted_data_types = Column(JSON, default=list) # e.g. ["RHI", "DEFAULT", "ENQUIRY"]
+    # REVIEW-LEGAL: Licence type governs monthly payment submission eligibility under NRB directives.
+    licence_type = Column(String, nullable=False) # e.g. CLASS_A_BFI, CLASS_B_BFI, CLASS_C_BFI, CLASS_D_BFI, UTILITY, TELECOM
+    permitted_data_types = Column(JSON, default=list) # e.g. ["RHI", "DEFAULT", "ENQUIRY", "UTILITY"]
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -163,16 +176,16 @@ class Provider(Base):
 class Entity(Base):
     """Credit subject profile representing an individual consumer or commercial company.
 
-    Sensitive government identifiers (ABN, ACN, Driver License) are protected via
+    Sensitive national identifiers (Citizenship No., National ID, PAN) are protected via
     AES-256-GCM field-level encryption. Exact searches are performed using an HMAC-SHA256
     blind index to avoid plaintext query patterns.
 
     Attributes:
         id: Primary key UUID string.
         type: Classification (INDIVIDUAL or COMPANY).
-        identifier: Ciphertext (AES-256-GCM) storing the government identifier.
+        identifier: Ciphertext (AES-256-GCM) storing Citizenship Number, National ID, or PAN.
         identifier_blind_index: HMAC-SHA256 deterministic hash for indexed exact lookup.
-        basic_info: Encrypted or masked demographic metadata (Name, DOB, Address).
+        basic_info: Encrypted or masked demographic metadata (Name, DOB/DOB_BS, Address, District, Province).
         created_at: Timestamp of subject file creation.
         ledger_records: Associated credit ledger history entries.
         scores: Historical and current credit score calculations.
@@ -378,10 +391,10 @@ class Enquiry(Base):
 
 
 class Dispute(Base):
-    """Statutory consumer dispute filed under Privacy Act 1988 (Cth) Section 20V.
+    """Statutory credit subject dispute filed under Nepal Individual Privacy Act 2018.
 
-    Credit reporting bodies must investigate and resolve correction requests within
-    a 30-day statutory SLA window.
+    Credit reporting institutions and bureaus must investigate and resolve correction requests
+    within the statutory SLA window.
 
     Attributes:
         id: Primary key UUID string.
@@ -389,7 +402,7 @@ class Dispute(Base):
         entity_id: Subject lodging the dispute.
         status: Current adjudication state (OPEN, UNDER_REVIEW, CORRECTED, UPHELD).
         notes: Supporting documentation, subject statement, or resolution reason.
-        created_at: Timestamp of dispute lodgement (starts the 30-day statutory clock).
+        created_at: Timestamp of dispute lodgement.
         resolved_at: Adjudication timestamp when status moved to CORRECTED or UPHELD.
     """
     __tablename__ = "disputes"
@@ -397,7 +410,7 @@ class Dispute(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     ledger_record_id = Column(String, ForeignKey("credit_ledger.id"), nullable=False)
     entity_id = Column(String, ForeignKey("entities.id"), nullable=False)
-    # REVIEW-LEGAL: Privacy Act 1988 s20V mandates 30-day resolution window for dispute status
+    # REVIEW-LEGAL: Individual Privacy Act 2018 Section 12 mandates dispute resolution window
     status = Column(String, default="OPEN") # OPEN, UNDER_REVIEW, CORRECTED, UPHELD
     notes = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

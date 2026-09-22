@@ -2,21 +2,20 @@
  * Comprehensive Consumer Credit File, Scoring Gauge & Dispute Portal.
  *
  * Primary consumer-facing and subscriber-facing credit file inspection interface featuring:
- * 1. Bureau Score Gauge: 0-1000 qualitative risk band scoring with key positive/negative contributing factors.
- * 2. 24-Month Repayment History Information (RHI): Statutory 24-month rolling calendar grid (0-24 codes, hardship A/V).
- * 3. Default & Adverse Listings: Comprehensive breakdown of Section 6Q defaults, bankruptcy, and judgments.
- * 4. What-If Score Simulator: Client-side model impact simulator for prospective credit actions (e.g. paying debts).
- * 5. Section 20V Dispute Modal: Direct consumer dispute submission interface with statutory 30-day resolution tracking.
- * 6. Bitemporal Enquiry Audit Log: Complete historical log of all subscriber hard and soft credit pulls.
+ * 1. National Credit Score Gauge: 5-pillar qualitative risk band scoring for Nepal.
+ * 2. 5 Statutory Scoring Pillars: Utility (35%), Blacklist (25%), Income (20%), Tax (12%), Rental (8%).
+ * 3. 24-Month Repayment & Utility History Grid: Monthly billing and repayment performance.
+ * 4. Section 12 Dispute Modal: Statutory dispute submission under Nepal Individual Privacy Act 2018.
+ * 5. What-If Score Simulator: Model impact simulator for prospective financial actions.
+ * 6. Dual Calendar System: Gregorian (A.D.) alongside Bikram Sambat (वि.सं. / B.S.).
  *
  * Architecture:
  *   Frontend Presentation Layer (Consumer Credit Report Route).
  *   Next.js dynamic route component ('use client') handling entity identifier in URL path.
- *   Interacts with `/api/reports/{id}`, `/api/disputes`, and scoring APIs.
  *
  * Legal / Regulatory:
- *   Privacy Act 1988 Part IIIA (Cth) Section 20R (Consumer access rights), Section 20N (RHI 24-month limits),
- *   Section 20V (Consumer dispute lodgement & adjudication), and Part IIIA Hardship neutrality rules.
+ *   Nepal Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५) Section 12 (Right to access & dispute)
+ *   and Nepal Rastra Bank (NRB) Credit Information Directives.
  */
 
 "use client";
@@ -49,15 +48,16 @@ import {
 } from '@carbon/icons-react';
 import Link from 'next/link';
 import { API_BASE } from '@/lib/api';
+import { useLocaleContext, useTranslations } from '@/lib/i18n';
+import { formatCurrency, formatDualDate, formatNumber, toDevanagariDigits } from '@/lib/nepaliDate';
 
-/**
- * Consumer Credit Report component for individual credit file inspection and dispute initiation.
- *
- * @returns JSX.Element rendering score gauge, 24-month RHI table, simulator, and dispute modal.
- */
 export default function CreditReportPage() {
   const params = useParams();
-  const routeId = (params?.id as string) || "IND-8842-1994";
+  const routeId = (params?.id as string) || "CIT-27-01-78-04821";
+  const { locale } = useLocaleContext();
+  const { t } = useTranslations('consumer');
+  const { t: tCommon } = useTranslations('common');
+
   const [liveReport, setLiveReport] = useState<any>(null);
   const [isLoadingApi, setIsLoadingApi] = useState<boolean>(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -89,7 +89,9 @@ export default function CreditReportPage() {
           setLiveReport(data);
           if (typeof window !== 'undefined') {
             const b = data.entity?.basic_info || {};
-            const subjectName = b.company_name || `${b.first_name || ''} ${b.last_name || ''}`.trim() || routeId;
+            const subjectName = b.first_name 
+              ? `${b.first_name} ${b.last_name || ''}`.trim()
+              : (b.company_name || routeId);
             localStorage.setItem('selected_entity', JSON.stringify({ id: routeId, name: subjectName }));
           }
         }
@@ -107,8 +109,8 @@ export default function CreditReportPage() {
 
   // Dispute modal state
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState<boolean>(false);
-  const [disputeTarget, setDisputeTarget] = useState<string>('DEF-TEL-2024-881');
-  const [disputeReason, setDisputeReason] = useState<string>('NOTICE_NOT_RECEIVED');
+  const [disputeTarget, setDisputeTarget] = useState<string>('DEF-KUKL-2024-881');
+  const [disputeReason, setDisputeReason] = useState<string>('METER_DISCREPANCY');
   const [disputeDetails, setDisputeDetails] = useState<string>('');
   const [disputeSubmitted, setDisputeSubmitted] = useState<boolean>(false);
   const [disputeSuccessMsg, setDisputeSuccessMsg] = useState<string>('');
@@ -126,39 +128,51 @@ export default function CreditReportPage() {
   // Density mode
   const [isCompact, setIsCompact] = useState<boolean>(false);
 
-  // Dynamic Subject Identity from Live API or Fallback Model
+  // Dynamic Subject Identity from Live API or Nepal Fallback Model
   const entityId = liveReport?.entity?.identifier || liveReport?.entity?.id || routeId;
-  const subjectName = liveReport?.entity?.basic_info?.first_name 
-    ? `${liveReport.entity.basic_info.first_name} ${liveReport.entity.basic_info.last_name || ''}`.trim()
-    : (liveReport?.entity?.basic_info?.company_name || "Jonathan Edward Vance");
-  const subjectDob = liveReport?.entity?.basic_info?.dob 
-    ? `${liveReport.entity.basic_info.dob} (Age ${new Date().getFullYear() - parseInt(liveReport.entity.basic_info.dob.slice(0, 4))})`
-    : "1984-06-14 (Age 42)";
-  const subjectAddress = liveReport?.entity?.basic_info?.address || "42 Miller St, North Sydney NSW 2060";
+  const basicInfo = liveReport?.entity?.basic_info || {};
+  const subjectName = basicInfo.first_name 
+    ? `${basicInfo.first_name} ${basicInfo.last_name || ''}`.trim()
+    : "राम कुमार श्रेष्ठ (Ram Kumar Shrestha)";
+  const citizenshipNo = basicInfo.citizenship_no || "२७-०१-७८-०४८२१ (27-01-78-04821)";
+  const nationalId = basicInfo.national_id || "१०८-२९४-८१७२ (108-294-8172)";
+  const subjectDob = basicInfo.dob 
+    ? `${basicInfo.dob} (${formatDualDate(basicInfo.dob, locale)})`
+    : "1984-05-28 (२०४१-०२-१५ वि.सं.)";
+  const subjectAddress = basicInfo.address || "नयाँ बानेश्वर, काठमाडौँ वडा नं १० (New Baneshwor, Kathmandu Ward 10)";
+  const subjectPhone = basicInfo.phone || "+977 9851082914";
 
   // Dynamic values derived from bitemporal ledger & score
   const snapshotData = useMemo(() => {
-    const liveScore = liveReport?.score?.value ?? 712;
-    const liveBand = liveReport?.score?.band ?? 'Good (Prime Tier 2)';
+    const liveScore = liveReport?.score?.value ?? 964;
+    const liveBand = liveReport?.score?.band ?? (locale === 'ne' ? 'उत्कृष्ट (Prime Tier 1)' : 'Excellent (Prime Tier 1)');
     const bandColor = liveScore >= 800 ? 'green' : liveScore >= 700 ? 'blue' : liveScore >= 600 ? 'cyan' : 'red';
     const hasDispute = disputeSubmitted || liveReport?.ledger?.some((l: any) => l.record_type === 'DEFAULT' && l.status === 'DISPUTED');
     const hasDefault = liveReport?.ledger?.some((l: any) => l.record_type === 'DEFAULT' && l.status === 'ACTIVE');
+
+    const subScores = liveReport?.score?.sub_scores || {
+      utility_payment_history: 343,
+      blacklist_adverse_records: 250,
+      income_stability: 180,
+      tax_compliance: 115,
+      rental_payment_history: 76
+    };
 
     return {
       score: liveScore,
       band: liveBand,
       bandColor: bandColor,
+      subScores,
       lastUpdated: liveReport?.score?.calculated_at 
-        ? `${liveReport.score.calculated_at.slice(0, 16).replace('T', ' ')} UTC` 
-        : (asOfDate === 'CURRENT' ? '2026-09-22 08:30 UTC' : `${asOfDate} 23:59 UTC`),
-      defaultStatus: hasDispute ? 'DISPUTED (Sec 20V)' : (hasDefault ? 'ACTIVE_DEFAULT' : 'CLEARED / PAID'),
+        ? formatDualDate(liveReport.score.calculated_at.slice(0, 10), locale)
+        : formatDualDate('2026-09-22', locale),
+      defaultStatus: hasDispute ? (locale === 'ne' ? 'विवादित (दफा १२)' : 'DISPUTED (Sec 12)') : (hasDefault ? 'ACTIVE_DEFAULT' : 'CLEARED / PAID'),
       defaultTagColor: hasDispute ? 'purple' : (hasDefault ? 'red' : 'green'),
-      utilization: 25.4,
-      totalDebt: 12340,
+      totalDebt: 3280000,
     };
-  }, [liveReport, asOfDate, disputeSubmitted]);
+  }, [liveReport, asOfDate, disputeSubmitted, locale]);
 
-  // Handle Time Travel switch: fetch bitemporal point-in-time reconstruction from API
+  // Handle Time Travel switch
   const handleTimeTravel = async (dateKey: string) => {
     setIsLoadingTimeTravel(true);
     setAsOfDate(dateKey);
@@ -182,75 +196,88 @@ export default function CreditReportPage() {
   // Calculate live simulated score
   const simulatedScore = useMemo(() => {
     let s = snapshotData.score;
-    const paydownPts = Math.min(28, Math.round((simDebtPaydown / 12340) * 28));
+    const paydownPts = Math.min(25, Math.round((simDebtPaydown / 500000) * 25));
     s += paydownPts;
-    if (simRemoveDefault) s += 45;
+    if (simRemoveDefault) s += 22;
     if (simNewInquiry) s -= 12;
     return Math.min(1000, Math.max(0, s));
   }, [snapshotData.score, simDebtPaydown, simRemoveDefault, simNewInquiry]);
 
-  // RHI Accounts dataset
-  const rhiAccounts = [
+  // Verified Credit & Utility Accounts dataset for Nepal
+  const accountsData = [
     {
-      id: 'a1',
-      accountNumber: '••••-••••-9921',
-      provider: 'Commonwealth Bank of Australia',
-      type: 'Credit Card (Revolving)',
-      limit: 20000,
-      balance: 4120,
-      opened: '2018-03-12',
-      status: 'OPEN / CURRENT',
-      apr: '18.49%',
-      minDue: '$125.00',
-      history: ['0', '0', '0', '1', '0', '0', '0', '0', '0', '0', '0', '0']
-    },
-    {
-      id: 'a2',
-      accountNumber: '••••-••••-1002',
-      provider: 'National Australia Bank',
-      type: 'Residential Mortgage (Term)',
-      limit: 650000,
-      balance: 482100,
-      opened: '2015-08-20',
-      status: 'OPEN / CURRENT',
-      apr: '5.89%',
-      minDue: '$3,180.00',
+      id: 'acc-nea',
+      accountNumber: 'CONSUMER-012.14.882',
+      provider: 'Nepal Electricity Authority (नेपाल विद्युत् प्राधिकरण - NEA)',
+      type: 'Utility - Electricity (विद्युत् महशुल)',
+      limit: 50000,
+      balance: 0,
+      opened: '2019-04-01',
+      status: 'OPEN / ACTIVE',
+      interestRate: 'N/A',
+      monthlyPayment: 4500,
       history: ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
     },
     {
-      id: 'a3',
-      accountNumber: '••••-••••-4412',
-      provider: 'Macquarie Leasing Pty Ltd',
-      type: 'Auto Loan (Secured)',
-      limit: 35000,
-      balance: 8220,
-      opened: '2021-11-04',
-      status: 'OPEN / CURRENT',
-      apr: '7.25%',
-      minDue: '$640.00',
-      history: ['0', '0', '0', '0', '0', '0', '1', '0', '0', '0', '0', '0']
+      id: 'acc-ntc',
+      accountNumber: 'LINE-01-4489124',
+      provider: 'Nepal Telecom (नेपाल टेलिकम - NTC)',
+      type: 'Utility - Telecom & FTTH (दूरसञ्चार तथा फाइबर)',
+      limit: 25000,
+      balance: 0,
+      opened: '2020-07-15',
+      status: 'OPEN / ACTIVE',
+      interestRate: 'N/A',
+      monthlyPayment: 2200,
+      history: ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
     },
     {
-      id: 'a4',
-      accountNumber: '••••-••••-8831',
-      provider: 'QuickCash Consumer Credit',
-      type: 'Personal Loan (Unsecured)',
-      limit: 5000,
+      id: 'acc-nabil',
+      accountNumber: 'NBL-HL-082914-01',
+      provider: 'Nabil Bank Limited (नबिल बैंक लिमिटेड - Class A BFI)',
+      type: 'Residential Mortgage / Housing Loan (आवासीय घर कर्जा)',
+      limit: 4500000,
+      balance: 3280000,
+      opened: '2021-09-01',
+      status: 'OPEN / ACTIVE',
+      interestRate: 'NRB Base + 1.85%',
+      monthlyPayment: 38500,
+      history: ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+    },
+    {
+      id: 'rec-ird-tax',
+      accountNumber: 'PAN-301982741',
+      provider: 'Inland Revenue Department (आन्तरिक राजस्व विभाग - IRD)',
+      type: 'Tax Compliance & Filing (कर चुक्ता प्रमाणपत्र)',
+      limit: 1850000,
       balance: 0,
-      opened: '2022-02-15',
-      status: 'CLOSED (Settled in Full)',
-      apr: '22.00%',
-      minDue: '$0.00',
-      history: ['C', 'C', 'C', 'X', '2', '1', '0', '0', '0', '0', '0', '0']
+      opened: '2021-07-16',
+      status: 'COMPLIANT / VERIFIED',
+      interestRate: 'N/A',
+      monthlyPayment: 0,
+      history: ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+    },
+    {
+      id: 'rec-rental-ktm',
+      accountNumber: 'TENANCY-WARD-10-KTM',
+      provider: 'Ward Office 10, Kathmandu (स्थानीय तह बहाल सम्झौता)',
+      type: 'Residential Tenancy Agreement (घरबहाल भुक्तानी)',
+      limit: 384000,
+      balance: 0,
+      opened: '2022-01-01',
+      status: 'VERIFIED / CURRENT',
+      interestRate: 'N/A',
+      monthlyPayment: 32000,
+      history: ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
     }
   ];
 
   const rhiMonthLabels = ['Sep 26', 'Aug 26', 'Jul 26', 'Jun 26', 'May 26', 'Apr 26', 'Mar 26', 'Feb 26', 'Jan 26', 'Dec 25', 'Nov 25', 'Oct 25'];
 
-  const filteredRhiAccounts = useMemo(() => {
-    return rhiAccounts.filter(acc => {
+  const filteredAccounts = useMemo(() => {
+    return accountsData.filter(acc => {
       const matchSearch = acc.provider.toLowerCase().includes(rhiSearch.toLowerCase()) || acc.accountNumber.includes(rhiSearch);
-      const matchType = rhiFilterType === 'ALL' || (rhiFilterType === 'REVOLVING' && acc.type.includes('Revolving')) || (rhiFilterType === 'MORTGAGE' && acc.type.includes('Mortgage')) || (rhiFilterType === 'TERM' && !acc.type.includes('Revolving') && !acc.type.includes('Mortgage'));
+      const matchType = rhiFilterType === 'ALL' || (rhiFilterType === 'UTILITY' && acc.type.includes('Utility')) || (rhiFilterType === 'MORTGAGE' && acc.type.includes('Mortgage')) || (rhiFilterType === 'TAX' && acc.type.includes('Tax'));
       return matchSearch && matchType;
     });
   }, [rhiSearch, rhiFilterType]);
@@ -258,7 +285,7 @@ export default function CreditReportPage() {
   const renderRhiCell = (val: string) => {
     switch (val) {
       case '0':
-        return <span className="inline-block w-6 h-6 leading-6 text-center text-xs font-mono font-bold bg-[#198038] text-white" title="0: Paid on time / within grace period">0</span>;
+        return <span className="inline-block w-6 h-6 leading-6 text-center text-xs font-mono font-bold bg-[#198038] text-white" title="0: Paid on time / नियमित भुक्तानी">0</span>;
       case '1':
         return <span className="inline-block w-6 h-6 leading-6 text-center text-xs font-mono font-bold bg-[#f1c21b] text-black" title="1: 1-29 days overdue">1</span>;
       case '2':
@@ -286,14 +313,22 @@ export default function CreditReportPage() {
         body: JSON.stringify({
           entity_id: entityId,
           ledger_record_id: disputeTarget,
-          notes: `Grounds: ${disputeReason}. Specific details: ${disputeDetails || 'Statutory notice requirements under Section 6Q / 21D not satisfied prior to listing.'}`
+          notes: `Nepal Individual Privacy Act 2018 Section 12 Dispute: ${disputeReason}. Details: ${disputeDetails || 'Pipeline water meter variance under technical audit.'}`
         })
       });
       const data = await res.json();
-      const dispId = data.dispute_id || `DISP-${Date.now().toString().slice(-6)}`;
-      setDisputeSuccessMsg(`Dispute ${dispId} successfully registered under Privacy Act 1988 Part IIIA s20V against ${disputeTarget}. Listing flagged 'UNDER INVESTIGATION' on all subscriber credit checks.`);
+      const dispId = data.dispute_id || `DISP-NP-${Date.now().toString().slice(-6)}`;
+      setDisputeSuccessMsg(
+        locale === 'ne'
+          ? `उजुरी ${dispId} वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५ को दफा १२ बमोजिम सफलतापूर्वक दर्ता गरियो। सम्बन्धित प्रविष्टि तत्काल 'विवादित' (DISPUTED) का रूपमा अद्यावधिक गरिएको छ।`
+          : `Dispute ${dispId} successfully registered under Section 12 of the Nepal Individual Privacy Act 2018 against ${disputeTarget}. Listing flagged as DISPUTED on all bureau credit inquiries.`
+      );
     } catch {
-      setDisputeSuccessMsg(`Dispute DISP-${Date.now().toString().slice(-6)} successfully lodged against ${disputeTarget}. Under Privacy Act 1988 Part IIIA s20V, this listing is flagged as 'UNDER INVESTIGATION' on all subscriber pulls.`);
+      setDisputeSuccessMsg(
+        locale === 'ne'
+          ? `उजुरी DISP-NP-${Date.now().toString().slice(-6)} सफलतापूर्वक दर्ता गरियो (दफा १२)।`
+          : `Dispute DISP-NP-${Date.now().toString().slice(-6)} successfully lodged under Section 12.`
+      );
     }
     setDisputeSubmitted(true);
     setIsDisputeModalOpen(false);
@@ -305,10 +340,12 @@ export default function CreditReportPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
-            Consumer Credit File: {subjectName}
+            {t('fileHeader', 'Consumer Credit File')}: {subjectName}
           </h1>
           <p className="text-xs text-[#999999] mt-1">
-            Comprehensive credit file, 24-month repayment history (RHI), and dispute management under Privacy Act Part IIIA.
+            {locale === 'ne'
+              ? 'वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५ तथा नेपाल राष्ट्र बैंकको मार्गदर्शन बमोजिम ५-स्तम्भ मूल्याङ्कन तथा विवरण।'
+              : 'Comprehensive 5-pillar credit file and Section 12 dispute management under Nepal Individual Privacy Act 2018.'}
           </p>
         </div>
 
@@ -319,7 +356,7 @@ export default function CreditReportPage() {
             onClick={() => setIsCompact(!isCompact)}
             className="text-xs text-[#999999] hover:text-white"
           >
-            Density: {isCompact ? 'Compact' : 'Standard'}
+            {isCompact ? 'Standard View' : 'Compact View'}
           </Button>
 
           <Button
@@ -328,7 +365,7 @@ export default function CreditReportPage() {
             renderIcon={DocumentAdd}
             onClick={() => setIsDisputeModalOpen(true)}
           >
-            Raise Dispute (Sec 20V)
+            {t('disputeBtn', 'Lodge Section 12 Dispute')}
           </Button>
 
           <Button
@@ -350,27 +387,45 @@ export default function CreditReportPage() {
               <h2 className="text-xl font-light text-[#e6e6e6] tracking-tight">
                 {subjectName}
               </h2>
-              <Tag type="green" size="sm" className="font-mono m-0">ACTIVE / VERIFIED</Tag>
-              <Tag type="blue" size="sm" className="font-mono m-0">CCR COMPLIANT</Tag>
+              <Tag type="green" size="sm" className="font-mono m-0">ACTIVE / VERIFIED (प्रमाणित)</Tag>
+              <Tag type="blue" size="sm" className="font-mono m-0">NRB COMPLIANT</Tag>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-[#999999]">
-              <div><span className="text-[#777777]">FILE NUMBER:</span> <span className="font-mono text-[#e6e6e6]">{entityId}</span></div>
-              <div><span className="text-[#777777]">DOB:</span> <span className="text-[#e6e6e6]">{subjectDob}</span></div>
-              <div><span className="text-[#777777]">ADDRESS:</span> <span className="text-[#e6e6e6]">{subjectAddress}</span></div>
-              <div><span className="text-[#777777]">JURISDICTION:</span> <span className="font-mono text-[#e6e6e6]">AU-NSW (Privacy Act Part IIIA)</span></div>
+              <div>
+                <span className="text-[#777777]">{t('citizenshipNo', 'Citizenship No.')}:</span>{' '}
+                <span className="font-mono text-[#e6e6e6] font-semibold">{citizenshipNo}</span>
+              </div>
+              <div>
+                <span className="text-[#777777]">{t('nationalId', 'National ID (NID)')}:</span>{' '}
+                <span className="font-mono text-[#e6e6e6]">{nationalId}</span>
+              </div>
+              <div>
+                <span className="text-[#777777]">{t('dob', 'Date of Birth')}:</span>{' '}
+                <span className="text-[#e6e6e6]">{subjectDob}</span>
+              </div>
+              <div>
+                <span className="text-[#777777]">{t('address', 'Permanent Address')}:</span>{' '}
+                <span className="text-[#e6e6e6]">{subjectAddress}</span>
+              </div>
+              <div>
+                <span className="text-[#777777]">{t('phone', 'Contact Number')}:</span>{' '}
+                <span className="font-mono text-[#e6e6e6]">{subjectPhone}</span>
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-4 text-xs bg-[#1c1c21] px-4 py-3 border border-[#202026] rounded-[2px]">
             <div>
-              <div className="text-[#777777] uppercase text-[10px] tracking-wider">As-Of Ledger State</div>
+              <div className="text-[#777777] uppercase text-[10px] tracking-wider">
+                {t('asOfLabel', 'Point-in-Time File Reconstruction')}
+              </div>
               <div className="font-mono font-bold text-[#e6e6e6] flex items-center gap-2">
                 {isLoadingTimeTravel ? <InlineLoading status="active" description="Traveling..." /> : snapshotData.lastUpdated}
               </div>
             </div>
             <div className="border-l border-[#202026] pl-4">
               <div className="text-[#777777] uppercase text-[10px] tracking-wider">Ledger State</div>
-              <div className="font-mono text-[#24a148] font-semibold">SYNCED (Bitemporal)</div>
+              <div className="font-mono text-[#24a148] font-semibold">SYNCED (अपरिवर्तनीय)</div>
             </div>
           </div>
         </div>
@@ -380,15 +435,15 @@ export default function CreditReportPage() {
           <div className="flex items-center gap-2 text-[#999999]">
             <Time size={16} className="text-[#0f62fe]" />
             <span className="font-semibold text-[#e6e6e6]">Bitemporal Time Machine:</span>
-            <span>Inspect historical score snapshot as committed at:</span>
+            <span>{locale === 'ne' ? 'ऐतिहासिक मितिअनुसार फाइलको स्थिति जाँच्नुहोस्:' : 'Inspect historical score snapshot as committed at:'}</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 font-mono text-xs">
             {[
-              { label: 'Realtime (T-0)', key: 'CURRENT' },
-              { label: '2026-06-30 (Q2 Close)', key: '2026-06-30' },
-              { label: '2025-12-31 (EOY 2025)', key: '2025-12-31' },
-              { label: '2024-03-01 (Adverse Period)', key: '2024-03-01' }
+              { label: 'Realtime (हालको)', key: 'CURRENT' },
+              { label: '2026-06-30 (२०८३ असार)', key: '2026-06-30' },
+              { label: '2025-12-31 (२०८२ पुस)', key: '2025-12-31' },
+              { label: '2024-03-01 (२०८० फागुन)', key: '2024-03-01' }
             ].map(b => (
               <button
                 key={b.key}
@@ -407,7 +462,7 @@ export default function CreditReportPage() {
         <div>
           <InlineNotification
             kind="info"
-            title="Formal Dispute Registered (Privacy Act 1988 Part IIIA s20V)"
+            title={locale === 'ne' ? "दफा १२ बमोजिम उजुरी दर्ता भयो (Nepal Individual Privacy Act 2018)" : "Formal Dispute Registered (Nepal Individual Privacy Act 2018 Section 12)"}
             subtitle={disputeSuccessMsg}
             onCloseButtonClick={() => setDisputeSubmitted(false)}
             lowContrast
@@ -416,80 +471,135 @@ export default function CreditReportPage() {
       )}
 
       {/* Main Multi-Tab Enterprise Report Sections */}
-      <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
+      <div className="bg-[#141417] border border-[#202026] rounded-[2px]">
         <Tabs>
-          <TabList aria-label="Bureau File Sections" className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)]">
-            <Tab className="text-xs uppercase font-semibold">1. Executive Risk & What-If</Tab>
-            <Tab className="text-xs uppercase font-semibold">2. 24-Month RHI Matrix</Tab>
-            <Tab className="text-xs uppercase font-semibold">3. Credit Accounts (CCR)</Tab>
-            <Tab className="text-xs uppercase font-semibold">4. Public Records & Defaults</Tab>
-            <Tab className="text-xs uppercase font-semibold">5. Inquiries & Velocity</Tab>
-            <Tab className="text-xs uppercase font-semibold">6. Hardship (Part IIIA)</Tab>
-            <Tab className="text-xs uppercase font-semibold">7. Bitemporal Audit Ledger</Tab>
+          <TabList aria-label="Bureau File Sections" className="bg-[#1c1c21] border-b border-[#202026]">
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '१. ५-स्तम्भ मूल्याङ्कन तथा सिमुलेटर' : '1. 5-Pillar Score & Simulator'}
+            </Tab>
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '२. २४ महिने भुक्तानी तालिका' : '2. 24-Month Payment Matrix'}
+            </Tab>
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '३. प्रमाणित कर्जा तथा महशुल खाताहरू' : '3. Verified Accounts'}
+            </Tab>
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '४. कालोसूची तथा प्रतिकूल अभिलेख' : '4. Blacklist & Adverse Records'}
+            </Tab>
+            <Tab className="text-xs uppercase font-semibold">
+              {locale === 'ne' ? '५. सोधपुछ तथा अडिट लग' : '5. Inquiries & Audit'}
+            </Tab>
           </TabList>
 
           <TabPanels>
-            {/* TAB 1: EXECUTIVE RISK & WHAT-IF SIMULATOR */}
+            {/* TAB 1: 5 STATUTORY PILLARS & SIMULATOR */}
             <TabPanel className="p-5 md:p-6">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Left Col: Scoring Waterfall Decomposition */}
+                {/* Left Col: 5-Pillar Score Breakdown */}
                 <div className="lg:col-span-7 space-y-6">
                   <div>
-                    <h2 className="text-lg font-medium text-white mb-1.5">Score Decomposition & Factor Weights</h2>
-                    <p className="text-xs text-[var(--cds-text-secondary)] mb-4 leading-relaxed">
-                      Deterministic score attribution derived from Australian Comprehensive Credit Reporting (CCR) inputs. Baseline model starts at 500 points.
+                    <div className="flex items-center justify-between mb-1.5">
+                      <h2 className="text-lg font-medium text-white">
+                        {t('pillarsTitle', 'Five Statutory Scoring Pillars')}
+                      </h2>
+                      <Tag type={snapshotData.bandColor as any} size="sm" className="font-mono m-0 font-bold">
+                        {snapshotData.band}
+                      </Tag>
+                    </div>
+                    <p className="text-xs text-[#999999] mb-4 leading-relaxed">
+                      {locale === 'ne'
+                        ? 'नेपाल राष्ट्र बैंकको मार्गदर्शन बमोजिम ५ मुख्य आधार स्तम्भहरू (कुल १००%) मा आधारित राष्ट्रिय कर्जा स्कोर।'
+                        : 'National credit score calculated across the 5 statutory Nepal pillars totaling exactly 100%.'}
                     </p>
 
                     <div
-                      className="border border-[var(--cds-border-subtle)] bg-[var(--cds-layer-02)] overflow-x-auto"
+                      className="border border-[#202026] bg-[#1c1c21] overflow-x-auto rounded-[2px]"
                       tabIndex={0}
                       role="region"
-                      aria-label="Risk Factor Attribution Table"
+                      aria-label="Statutory 5-Pillar Breakdown Table"
                     >
                       <table className="w-full text-left text-xs">
                         <thead>
-                          <tr className="border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase tracking-wider text-[11px]">
-                            <th className="p-3 w-5/12">Risk Factor Attribution</th>
-                            <th className="p-3 w-3/12">Category</th>
-                            <th className="p-3 w-2/12 font-mono">Impact</th>
-                            <th className="p-3 w-2/12 text-center">Signal</th>
+                          <tr className="border-b border-[#202026] text-[#999999] uppercase tracking-wider text-[11px] bg-[#141417]">
+                            <th className="p-3 w-5/12">{locale === 'ne' ? 'आधार स्तम्भ' : 'Statutory Pillar'}</th>
+                            <th className="p-3 w-3/12">{locale === 'ne' ? 'निर्धारित भार' : 'Weight (%)'}</th>
+                            <th className="p-3 w-2/12 font-mono">{locale === 'ne' ? 'प्राप्त अंक' : 'Score Points'}</th>
+                            <th className="p-3 w-2/12 text-center">{locale === 'ne' ? 'संकेत' : 'Signal'}</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                          <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
-                            <td className="p-3 font-medium text-white">Consistent 12m Repayment Track</td>
-                            <td className="p-3 text-[var(--cds-text-secondary)]">RHI Reliability (98.6%)</td>
-                            <td className="p-3 text-[#42be65] font-mono font-bold">+48 pts</td>
-                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#42be65] inline" size={16} /></td>
+                        <tbody className="divide-y divide-[#202026]">
+                          {/* Pillar 1: Utility */}
+                          <tr className="hover:bg-[#26262d] transition-colors">
+                            <td className="p-3 font-medium text-white">
+                              <div>{t('utilityHistory', 'Utility Payment History')}</div>
+                              <div className="text-[11px] text-[#777777]">{t('utilityDesc')}</div>
+                            </td>
+                            <td className="p-3 text-[#999999] font-mono">{t('utilityWeight', '35% Weight')}</td>
+                            <td className="p-3 text-[#24a148] font-mono font-bold">
+                              {formatNumber(snapshotData.subScores.utility_payment_history, locale)} / {formatNumber(350, locale)}
+                            </td>
+                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#24a148] inline" size={16} /></td>
                           </tr>
-                          <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
-                            <td className="p-3 font-medium text-white">Revolving Utilisation &lt; 30%</td>
-                            <td className="p-3 text-[var(--cds-text-secondary)]">Capacity / Liquidity</td>
-                            <td className="p-3 text-[#42be65] font-mono font-bold">+15 pts</td>
-                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#42be65] inline" size={16} /></td>
+
+                          {/* Pillar 2: Blacklist / Adverse */}
+                          <tr className="hover:bg-[#26262d] transition-colors">
+                            <td className="p-3 font-medium text-white">
+                              <div>{t('blacklistAdverse', 'Blacklist / Adverse Records')}</div>
+                              <div className="text-[11px] text-[#777777]">{t('blacklistDesc')}</div>
+                            </td>
+                            <td className="p-3 text-[#999999] font-mono">{t('blacklistWeight', '25% Weight')}</td>
+                            <td className="p-3 text-[#24a148] font-mono font-bold">
+                              {formatNumber(snapshotData.subScores.blacklist_adverse_records, locale)} / {formatNumber(250, locale)}
+                            </td>
+                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#24a148] inline" size={16} /></td>
                           </tr>
-                          <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
-                            <td className="p-3 font-medium text-white">Seasoned Account Longevity</td>
-                            <td className="p-3 text-[var(--cds-text-secondary)]">Credit History (Avg 6.4y)</td>
-                            <td className="p-3 text-[#42be65] font-mono font-bold">+22 pts</td>
-                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#42be65] inline" size={16} /></td>
+
+                          {/* Pillar 3: Income Stability */}
+                          <tr className="hover:bg-[#26262d] transition-colors">
+                            <td className="p-3 font-medium text-white">
+                              <div>{t('incomeStability', 'Income & Banking Standing')}</div>
+                              <div className="text-[11px] text-[#777777]">{t('incomeDesc')}</div>
+                            </td>
+                            <td className="p-3 text-[#999999] font-mono">{t('incomeWeight', '20% Weight')}</td>
+                            <td className="p-3 text-[#24a148] font-mono font-bold">
+                              {formatNumber(snapshotData.subScores.income_stability, locale)} / {formatNumber(200, locale)}
+                            </td>
+                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#24a148] inline" size={16} /></td>
                           </tr>
-                          <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
-                            <td className="p-3 font-medium text-white">Telstra Consumer Default ($420)</td>
-                            <td className="p-3 text-[var(--cds-text-secondary)]">Adverse Listing (Under Dispute)</td>
-                            <td className="p-3 text-[#ff8389] font-mono font-bold">-45 pts</td>
-                            <td className="p-3 text-center"><ErrorIcon className="text-[#ff8389] inline" size={16} /></td>
+
+                          {/* Pillar 4: Tax Compliance */}
+                          <tr className="hover:bg-[#26262d] transition-colors">
+                            <td className="p-3 font-medium text-white">
+                              <div>{t('taxCompliance', 'Business & Tax Compliance')}</div>
+                              <div className="text-[11px] text-[#777777]">{t('taxDesc')}</div>
+                            </td>
+                            <td className="p-3 text-[#999999] font-mono">{t('taxWeight', '12% Weight')}</td>
+                            <td className="p-3 text-[#24a148] font-mono font-bold">
+                              {formatNumber(snapshotData.subScores.tax_compliance, locale)} / {formatNumber(120, locale)}
+                            </td>
+                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#24a148] inline" size={16} /></td>
                           </tr>
-                          <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
-                            <td className="p-3 font-medium text-white">Recent Credit Velocity (3 Enquiries)</td>
-                            <td className="p-3 text-[var(--cds-text-secondary)]">Hard Inquiries (12m)</td>
-                            <td className="p-3 text-[#f1c21b] font-mono font-bold">-8 pts</td>
-                            <td className="p-3 text-center"><Warning className="text-[#f1c21b] inline" size={16} /></td>
+
+                          {/* Pillar 5: Rental History */}
+                          <tr className="hover:bg-[#26262d] transition-colors">
+                            <td className="p-3 font-medium text-white">
+                              <div>{t('rentalHistory', 'Rental Payment History')}</div>
+                              <div className="text-[11px] text-[#777777]">{t('rentalDesc')}</div>
+                            </td>
+                            <td className="p-3 text-[#999999] font-mono">{t('rentalWeight', '8% Weight')}</td>
+                            <td className="p-3 text-[#24a148] font-mono font-bold">
+                              {formatNumber(snapshotData.subScores.rental_payment_history, locale)} / {formatNumber(80, locale)}
+                            </td>
+                            <td className="p-3 text-center"><CheckmarkOutline className="text-[#24a148] inline" size={16} /></td>
                           </tr>
-                          <tr className="bg-[var(--cds-layer-01)] font-bold">
-                            <td className="p-3 text-white" colSpan={2}>Net Calculated Credit Score</td>
-                            <td className="p-3 text-[#78a9ff] font-mono text-sm" colSpan={2}>
-                              712 / 1000
+
+                          {/* Total Score */}
+                          <tr className="bg-[#141417] font-bold border-t-2 border-[#202026]">
+                            <td className="p-3 text-white" colSpan={2}>
+                              {locale === 'ne' ? 'कुल राष्ट्रिय कर्जा स्कोर' : 'Net Evaluated Credit Score'}
+                            </td>
+                            <td className="p-3 text-[#0f62fe] font-mono text-base" colSpan={2}>
+                              {formatNumber(snapshotData.score, locale)} / {formatNumber(1000, locale)} PTS
                             </td>
                           </tr>
                         </tbody>
@@ -499,51 +609,72 @@ export default function CreditReportPage() {
 
                   {/* Portfolio Facilities Breakdown */}
                   <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--cds-text-secondary)] mb-3">
-                      Credit Facility Exposure Breakdown
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-[#999999] mb-3">
+                      {locale === 'ne' ? 'प्रमाणित दायित्व तथा सेवा विवरण' : 'Verified Facility Exposure'}
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="p-3 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                        <div className="text-[10px] text-[var(--cds-text-helper)] uppercase font-medium">Mortgages</div>
-                        <div className="text-base font-mono font-bold text-white mt-1">$482,100</div>
-                        <div className="text-[10px] text-[var(--cds-text-secondary)] mt-0.5">1 Account &bull; Prime</div>
+                      <div className="p-3 bg-[#1c1c21] border border-[#202026] rounded-[2px]">
+                        <div className="text-[10px] text-[#777777] uppercase font-medium">
+                          {locale === 'ne' ? 'आवासीय घर कर्जा' : 'Housing Loan'}
+                        </div>
+                        <div className="text-sm font-mono font-bold text-white mt-1">
+                          {formatCurrency(3280000, locale)}
+                        </div>
+                        <div className="text-[10px] text-[#999999] mt-0.5">Nabil Bank &bull; Prime</div>
                       </div>
-                      <div className="p-3 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                        <div className="text-[10px] text-[var(--cds-text-helper)] uppercase font-medium">Credit Cards</div>
-                        <div className="text-base font-mono font-bold text-white mt-1">$4,120</div>
-                        <div className="text-[10px] text-[var(--cds-text-secondary)] mt-0.5">1 Line &bull; 20.6% Util</div>
+
+                      <div className="p-3 bg-[#1c1c21] border border-[#202026] rounded-[2px]">
+                        <div className="text-[10px] text-[#777777] uppercase font-medium">
+                          {locale === 'ne' ? 'विद्युत् महशुल' : 'Electricity (NEA)'}
+                        </div>
+                        <div className="text-sm font-mono font-bold text-white mt-1">
+                          {formatCurrency(4500, locale)}
+                        </div>
+                        <div className="text-[10px] text-[#24a148] mt-0.5">२४ महिना नियमित</div>
                       </div>
-                      <div className="p-3 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                        <div className="text-[10px] text-[var(--cds-text-helper)] uppercase font-medium">Auto Finance</div>
-                        <div className="text-base font-mono font-bold text-white mt-1">$8,220</div>
-                        <div className="text-[10px] text-[var(--cds-text-secondary)] mt-0.5">Secured &bull; Current</div>
+
+                      <div className="p-3 bg-[#1c1c21] border border-[#202026] rounded-[2px]">
+                        <div className="text-[10px] text-[#777777] uppercase font-medium">
+                          {locale === 'ne' ? 'दूरसञ्चार' : 'Telecom (NTC)'}
+                        </div>
+                        <div className="text-sm font-mono font-bold text-white mt-1">
+                          {formatCurrency(2200, locale)}
+                        </div>
+                        <div className="text-[10px] text-[#24a148] mt-0.5">FTTH Unlimited</div>
                       </div>
-                      <div className="p-3 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">
-                        <div className="text-[10px] text-[var(--cds-text-helper)] uppercase font-medium">Personal Loans</div>
-                        <div className="text-base font-mono font-bold text-white mt-1">$0.00</div>
-                        <div className="text-[10px] text-[#42be65] mt-0.5">Closed / Settled</div>
+
+                      <div className="p-3 bg-[#1c1c21] border border-[#202026] rounded-[2px]">
+                        <div className="text-[10px] text-[#777777] uppercase font-medium">
+                          {locale === 'ne' ? 'घरबहाल' : 'Residential Lease'}
+                        </div>
+                        <div className="text-sm font-mono font-bold text-white mt-1">
+                          {formatCurrency(32000, locale)}
+                        </div>
+                        <div className="text-[10px] text-[#24a148] mt-0.5">वडा १० दर्ता सम्झौता</div>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Right Col: Interactive Score Simulator ("What-If" Risk Sandbox) */}
-                <div className="lg:col-span-5 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] p-5 flex flex-col justify-between">
+                <div className="lg:col-span-5 bg-[#1c1c21] border border-[#202026] p-5 flex flex-col justify-between rounded-[2px]">
                   <div>
-                    <div className="flex items-center justify-between pb-3 border-b border-[var(--cds-border-subtle)] mb-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#202026] mb-4">
                       <div className="flex items-center gap-2">
                         <Renew size={18} className="text-[#0f62fe]" />
                         <h4 className="text-sm font-semibold uppercase tracking-wider text-white">
-                          Live "What-If" Score Simulator
+                          {t('simulatorTitle', 'What-If Score Impact Simulator')}
                         </h4>
                       </div>
-                      <span className="text-[10px] font-mono bg-[#002d9c] text-white px-2 py-0.5 border border-[#0043ce]">
-                        Interactive Model
+                      <span className="text-[10px] font-mono bg-[#0f62fe]/20 text-[#0f62fe] px-2 py-0.5 border border-[#0f62fe]/40 rounded-[2px]">
+                        Interactive
                       </span>
                     </div>
 
-                    <p className="text-xs text-[var(--cds-text-secondary)] mb-6 leading-relaxed">
-                      Adjust hypothetical consumer actions to immediately observe simulated score variances calculated under Privacy Act 1988 Part IIIA and Privacy (Credit Reporting) Code rules.
+                    <p className="text-xs text-[#999999] mb-6 leading-relaxed">
+                      {locale === 'ne'
+                        ? 'विभिन्न वित्तीय निर्णयहरू (जस्तै कर्जा चुक्ता, विवादित विवरण सच्याउने) ले तपाईंको स्कोरमा पार्ने प्रभाव जाँच्नुहोस्।'
+                        : 'Simulate prospective credit actions to observe scoring variances under the Nepal national scoring model.'}
                     </p>
 
                     {/* Simulator Controls */}
@@ -551,81 +682,100 @@ export default function CreditReportPage() {
                       {/* Control 1: Debt Paydown Slider */}
                       <div>
                         <div className="flex justify-between text-xs mb-2">
-                          <label htmlFor="sim-debt-slider" className="font-medium text-white">Credit Card Balance Paydown ($AUD):</label>
-                          <span className="font-mono text-[var(--cds-link-primary)] font-bold">${simDebtPaydown}</span>
+                          <label htmlFor="sim-debt-slider" className="font-medium text-white">
+                            {t('simPaydown', 'Simulated Debt Settlement (NPR)')}:
+                          </label>
+                          <span className="font-mono text-[#0f62fe] font-bold">
+                            {formatCurrency(simDebtPaydown, locale)}
+                          </span>
                         </div>
                         <input
                           id="sim-debt-slider"
-                          aria-label="Credit Card Balance Paydown amount in AUD"
+                          aria-label="Debt Paydown in Nepalese Rupees"
                           type="range"
                           min="0"
-                          max="4120"
-                          step="500"
+                          max="500000"
+                          step="50000"
                           value={simDebtPaydown}
                           onChange={(e) => setSimDebtPaydown(Number(e.target.value))}
                           className="w-full accent-[#0f62fe] cursor-pointer"
                         />
                       </div>
 
-                      {/* Control 2: Default Removal Toggle */}
-                      <div className="flex items-center justify-between p-3.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
+                      {/* Control 2: Dispute Correction Toggle */}
+                      <div className="flex items-center justify-between p-3.5 bg-[#141417] border border-[#202026] rounded-[2px]">
                         <div>
-                          <div className="text-xs font-medium text-white">Expunge Telstra Default ($420)</div>
-                          <div className="text-[11px] text-[var(--cds-text-secondary)]">Simulates Section 20V dispute correction</div>
+                          <div className="text-xs font-medium text-white">
+                            {locale === 'ne' ? 'खानेपानी महशुल विवाद सच्याउने (रु १२,५००)' : 'Rectify KUKL Water Dispute (NPR 12,500)'}
+                          </div>
+                          <div className="text-[11px] text-[#999999]">
+                            {locale === 'ne' ? 'दफा १२ बमोजिम उजुरी सदर हुँदा' : 'Simulates Section 12 dispute correction'}
+                          </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => setSimRemoveDefault(!simRemoveDefault)}
-                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simRemoveDefault ? 'bg-[#24a148] text-white border-[#42be65]' : 'bg-[var(--cds-layer-03)] text-white border-transparent hover:text-white'}`}
+                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all rounded-[2px] ${simRemoveDefault ? 'bg-[#24a148] text-white border-[#24a148]' : 'bg-[#26262d] text-white border-transparent hover:text-white'}`}
                         >
-                          {simRemoveDefault ? 'RESOLVED (+45)' : 'EXCLUDE'}
+                          {simRemoveDefault ? (locale === 'ne' ? 'सच्याइयो (+२२)' : 'RESOLVED (+22)') : (locale === 'ne' ? 'समावेश' : 'EXCLUDE')}
                         </button>
                       </div>
 
-                      {/* Control 3: New Credit Application Toggle */}
-                      <div className="flex items-center justify-between p-3.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
+                      {/* Control 3: New Loan Application Toggle */}
+                      <div className="flex items-center justify-between p-3.5 bg-[#141417] border border-[#202026] rounded-[2px]">
                         <div>
-                          <div className="text-xs font-medium text-white">New $15,000 Unsecured Facility</div>
-                          <div className="text-[11px] text-[var(--cds-text-secondary)]">Simulates hard inquiry + debt expansion</div>
+                          <div className="text-xs font-medium text-white">
+                            {locale === 'ne' ? 'नयाँ रु ५,००,००० बैंक कर्जा आवेदन' : 'New NPR 500,000 Loan Application'}
+                          </div>
+                          <div className="text-[11px] text-[#999999]">
+                            {locale === 'ne' ? 'नयाँ कर्जा सोधपुछ तथा दायित्व विस्तार' : 'Simulates new BFI inquiry impact'}
+                          </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => setSimNewInquiry(!simNewInquiry)}
-                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simNewInquiry ? 'bg-[#da1e28] text-white border-[#fa4d56]' : 'bg-[var(--cds-layer-03)] text-white border-transparent hover:text-white'}`}
+                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all rounded-[2px] ${simNewInquiry ? 'bg-[#da1e28] text-white border-[#da1e28]' : 'bg-[#26262d] text-white border-transparent hover:text-white'}`}
                         >
-                          {simNewInquiry ? 'APPLIED (-12)' : 'EXCLUDE'}
+                          {simNewInquiry ? (locale === 'ne' ? 'आवेदन गरियो (-१२)' : 'APPLIED (-12)') : (locale === 'ne' ? 'समावेश' : 'EXCLUDE')}
                         </button>
                       </div>
                     </div>
                   </div>
 
                   {/* Dynamic Simulation Result Card */}
-                  <div className="mt-6 pt-4 border-t border-[var(--cds-border-subtle)] bg-[var(--cds-layer-01)] p-4 border">
-                    <div className="text-xs text-[var(--cds-text-helper)] uppercase tracking-wider font-semibold mb-1">
-                      Projected Score Variance
+                  <div className="mt-6 pt-4 border-t border-[#202026] bg-[#141417] p-4 rounded-[2px]">
+                    <div className="text-xs text-[#777777] uppercase tracking-wider font-semibold mb-1">
+                      {t('simResult', 'Projected Score Outcome')}
                     </div>
                     <div className="flex items-baseline justify-between">
                       <div className="flex items-baseline gap-2">
                         <span className="text-4xl font-mono font-bold text-white tabular-nums">
-                          {simulatedScore}
+                          {formatNumber(simulatedScore, locale)}
                         </span>
-                        <span className="text-xs font-mono text-[var(--cds-text-helper)]">
-                          / 1000
+                        <span className="text-xs font-mono text-[#777777]">
+                          / {formatNumber(1000, locale)}
                         </span>
                       </div>
 
-                      <div className={`font-mono text-sm font-bold ${simulatedScore >= snapshotData.score ? 'text-[#42be65]' : 'text-[#ff8389]'}`}>
+                      <div className={`font-mono text-sm font-bold ${simulatedScore >= snapshotData.score ? 'text-[#24a148]' : 'text-[#da1e28]'}`}>
                         {simulatedScore >= snapshotData.score ? `+${simulatedScore - snapshotData.score}` : `${simulatedScore - snapshotData.score}`} pts delta
                       </div>
                     </div>
 
-                    <div className="text-xs text-[var(--cds-text-secondary)] mt-2.5 flex items-center justify-between border-t border-[var(--cds-border-subtle)] pt-2">
-                      <span>Simulated Risk: <strong className="text-white">{simulatedScore >= 740 ? 'Tier 1 - Super-Prime' : simulatedScore >= 680 ? 'Tier 2 - Prime' : 'Tier 3 - Near-Prime'}</strong></span>
+                    <div className="text-xs text-[#999999] mt-2.5 flex items-center justify-between border-t border-[#202026] pt-2">
+                      <span>
+                        {locale === 'ne' ? 'अनुमानित वर्ग: ' : 'Simulated Risk: '}
+                        <strong className="text-white">
+                          {simulatedScore >= 800 
+                            ? (locale === 'ne' ? 'उत्कृष्ट (Tier 1 Prime)' : 'Excellent (Tier 1 Prime)') 
+                            : (locale === 'ne' ? 'धेरै राम्रो (Tier 2)' : 'Very Good (Tier 2)')}
+                        </strong>
+                      </span>
                       <button 
                         onClick={() => { setSimDebtPaydown(0); setSimRemoveDefault(false); setSimNewInquiry(false); }}
-                        className="text-[var(--cds-link-primary)] hover:underline flex items-center gap-1 font-mono text-[11px]"
+                        className="text-[#0f62fe] hover:underline flex items-center gap-1 font-mono text-[11px]"
                       >
-                        <Undo size={12} /> Reset
+                        <Undo size={12} /> {locale === 'ne' ? 'रिसेट गर्नुहोस्' : 'Reset'}
                       </button>
                     </div>
                   </div>
@@ -633,13 +783,17 @@ export default function CreditReportPage() {
               </div>
             </TabPanel>
 
-            {/* TAB 2: 24-MONTH RHI MATRIX */}
+            {/* TAB 2: 24-MONTH RHI & UTILITY MATRIX */}
             <TabPanel className="p-5 md:p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                 <div>
-                  <h2 className="text-lg font-medium text-white">24-Month Repayment History Information (RHI) Matrix</h2>
-                  <p className="text-xs text-[var(--cds-text-secondary)]">
-                    Official CCR monthly codes: 0 = On Time, 1 = 1-29d overdue, 2 = 30-59d, 3-6 = 60+d, X = Not Reported, C = Closed.
+                  <h2 className="text-lg font-medium text-white">
+                    {t('rhiGridTitle', '24-Month Rolling Repayment Grid')}
+                  </h2>
+                  <p className="text-xs text-[#999999]">
+                    {locale === 'ne'
+                      ? 'मासिक भुक्तानी संकेत: ० = समयमै भुक्तानी (On Time), १-६ = म्याद नाघेको दिन, X = विवरण नभएको।'
+                      : 'Monthly payment indicators: 0 = On Time, 1-6 = Overdue brackets, X = No data.'}
                   </p>
                 </div>
 
@@ -651,7 +805,7 @@ export default function CreditReportPage() {
                     placeholder="Filter provider or account..."
                     value={rhiSearch}
                     onChange={(e) => setRhiSearch(e.target.value)}
-                    className="bg-[var(--cds-field)] text-white text-xs px-3 py-1.5 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none w-56"
+                    className="bg-[#0b0b0d] text-white text-xs px-3 py-1.5 border border-[#202026] focus:border-[#0f62fe] focus:outline-none w-56 rounded-[2px]"
                   />
 
                   <select
@@ -659,30 +813,26 @@ export default function CreditReportPage() {
                     aria-label="Filter by facility type"
                     value={rhiFilterType}
                     onChange={(e) => setRhiFilterType(e.target.value)}
-                    className="bg-[var(--cds-field)] text-white text-xs px-3 py-1.5 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
+                    className="bg-[#0b0b0d] text-white text-xs px-3 py-1.5 border border-[#202026] focus:border-[#0f62fe] focus:outline-none rounded-[2px]"
                   >
-                    <option value="ALL">All Facilities (4)</option>
-                    <option value="REVOLVING">Credit Cards</option>
-                    <option value="MORTGAGE">Mortgages</option>
-                    <option value="TERM">Term & Auto</option>
+                    <option value="ALL">All Facilities (5)</option>
+                    <option value="UTILITY">Utilities (NEA / NTC)</option>
+                    <option value="MORTGAGE">Housing Loan (Nabil)</option>
+                    <option value="TAX">Tax & Tenancy</option>
                   </select>
                 </div>
               </div>
 
               {/* RHI Legend Bar */}
-              <div className="flex flex-wrap items-center gap-4 text-xs bg-[var(--cds-layer-02)] p-3 mb-4 border border-[var(--cds-border-subtle)]">
-                <span className="text-[var(--cds-text-helper)] font-bold text-[11px] uppercase tracking-wider">RHI Legend:</span>
+              <div className="flex flex-wrap items-center gap-4 text-xs bg-[#1c1c21] p-3 mb-4 border border-[#202026] rounded-[2px]">
+                <span className="text-[#777777] font-bold text-[11px] uppercase tracking-wider">Legend:</span>
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-4 bg-[#198038] text-white text-[10px] font-mono font-bold text-center leading-4 inline-block">0</span>
-                  <span className="text-[#c6c6c6]">Current (On Time)</span>
+                  <span className="text-[#c6c6c6]">{locale === 'ne' ? 'समयमै भुक्तानी' : 'Current (On Time)'}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-4 bg-[#f1c21b] text-black text-[10px] font-mono font-bold text-center leading-4 inline-block">1</span>
                   <span className="text-[#c6c6c6]">1-29d overdue</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-4 h-4 bg-[#ff832b] text-black text-[10px] font-mono font-bold text-center leading-4 inline-block">2</span>
-                  <span className="text-[#c6c6c6]">30-59d overdue</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-4 bg-[#da1e28] text-white text-[10px] font-mono font-bold text-center leading-4 inline-block">3-6</span>
@@ -690,27 +840,23 @@ export default function CreditReportPage() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-4 bg-[#525252] text-[#c6c6c6] text-[10px] font-mono font-bold text-center leading-4 inline-block">X</span>
-                  <span className="text-[#c6c6c6]">No data / Grace</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-4 h-4 bg-[#262626] text-[#8d8d8d] text-[10px] font-mono font-bold text-center leading-4 inline-block">C</span>
-                  <span className="text-[#c6c6c6]">Account Closed</span>
+                  <span className="text-[#c6c6c6]">No data</span>
                 </div>
               </div>
 
-              {/* Comprehensive 24-Month Grid Table */}
+              {/* 24-Month Grid Table */}
               <div
-                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                className="border border-[#202026] overflow-x-auto rounded-[2px]"
                 tabIndex={0}
                 role="region"
-                aria-label="24-Month Repayment History Information Grid"
+                aria-label="24-Month Repayment and Utility History Grid"
               >
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
-                      <th className="p-3 min-w-[240px]">Credit Provider & Facility</th>
-                      <th className="p-3 text-right font-mono">Limit</th>
-                      <th className="p-3 text-right font-mono">Balance</th>
+                    <tr className="bg-[#1c1c21] border-b border-[#202026] text-[#999999] uppercase text-[11px] tracking-wider">
+                      <th className="p-3 min-w-[240px]">{locale === 'ne' ? 'निकाय तथा सेवा विवरण' : 'Provider & Facility'}</th>
+                      <th className="p-3 text-right font-mono">{locale === 'ne' ? 'स्वीकृत सीमा' : 'Limit'}</th>
+                      <th className="p-3 text-right font-mono">{locale === 'ne' ? 'बाँकी बक्यौता' : 'Balance'}</th>
                       {rhiMonthLabels.map((m, idx) => (
                         <th key={idx} className="p-2 text-center text-[11px] font-mono whitespace-nowrap">
                           {m}
@@ -718,26 +864,30 @@ export default function CreditReportPage() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                    {filteredRhiAccounts.map(acc => (
+                  <tbody className="divide-y divide-[#202026]">
+                    {filteredAccounts.map(acc => (
                       <React.Fragment key={acc.id}>
                         <tr 
                           onClick={() => setExpandedAccount(expandedAccount === acc.id ? null : acc.id)}
-                          className="hover:bg-[var(--cds-layer-02)] cursor-pointer transition-colors"
+                          className="hover:bg-[#1c1c21] cursor-pointer transition-colors"
                         >
                           <td className="p-3 font-medium text-white">
                             <div className="flex items-center gap-2">
                               {expandedAccount === acc.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                               <div>
                                 <div>{acc.provider}</div>
-                                <div className="text-[11px] text-[var(--cds-text-helper)] font-normal">
+                                <div className="text-[11px] text-[#777777] font-normal">
                                   {acc.type} &bull; <span className="font-mono">{acc.accountNumber}</span>
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-[#c6c6c6]">${acc.limit.toLocaleString()}</td>
-                          <td className="p-3 text-right font-mono font-bold text-white">${acc.balance.toLocaleString()}</td>
+                          <td className="p-3 text-right font-mono text-[#c6c6c6]">
+                            {formatCurrency(acc.limit, locale)}
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-white">
+                            {formatCurrency(acc.balance, locale)}
+                          </td>
                           {acc.history.map((hVal, hIdx) => (
                             <td key={hIdx} className="p-2 text-center">
                               {renderRhiCell(hVal)}
@@ -747,33 +897,33 @@ export default function CreditReportPage() {
 
                         {/* Expandable Account Details Row */}
                         {expandedAccount === acc.id && (
-                          <tr className="bg-[var(--cds-layer-02)]">
-                            <td colSpan={15} className="p-4 border-t border-b border-[var(--cds-border-subtle)]">
+                          <tr className="bg-[#1c1c21]">
+                            <td colSpan={15} className="p-4 border-t border-b border-[#202026]">
                               <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
                                 <div>
-                                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">FACILITY STATUS:</span>
+                                  <span className="text-[#777777] block text-[10px] uppercase font-semibold">STATUS:</span>
                                   <span className="font-mono text-white font-bold">{acc.status}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">OPEN DATE:</span>
-                                  <span className="font-mono text-white">{acc.opened}</span>
+                                  <span className="text-[#777777] block text-[10px] uppercase font-semibold">OPEN DATE:</span>
+                                  <span className="font-mono text-white">{formatDualDate(acc.opened, locale)}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">PURCHASE APR:</span>
-                                  <span className="font-mono text-white">{acc.apr}</span>
+                                  <span className="text-[#777777] block text-[10px] uppercase font-semibold">INTEREST / TARIFF:</span>
+                                  <span className="font-mono text-white">{acc.interestRate}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">MONTHLY MINIMUM:</span>
-                                  <span className="font-mono text-white">{acc.minDue}</span>
+                                  <span className="text-[#777777] block text-[10px] uppercase font-semibold">MONTHLY BILL / EMI:</span>
+                                  <span className="font-mono text-white">{formatCurrency(acc.monthlyPayment, locale)}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Button 
                                     size="sm" 
                                     kind="ghost" 
-                                    className="text-xs text-[var(--cds-link-primary)]"
+                                    className="text-xs text-[#0f62fe]"
                                     onClick={(e: any) => { e.stopPropagation(); setIsDisputeModalOpen(true); }}
                                   >
-                                    Dispute RHI Code
+                                    {t('disputeBtn', 'Lodge Dispute (Sec 12)')}
                                   </Button>
                                 </div>
                               </div>
@@ -787,61 +937,67 @@ export default function CreditReportPage() {
               </div>
             </TabPanel>
 
-            {/* TAB 3: CREDIT ACCOUNTS (CCR LINES) */}
+            {/* TAB 3: VERIFIED CREDIT & UTILITY ACCOUNTS */}
             <TabPanel className="p-5 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-medium text-white">Active Credit Accounts & CCR Tradelines</h2>
-                  <p className="text-xs text-[var(--cds-text-secondary)]">
-                    Reported by eligible credit providers under Privacy Act 1988 Part IIIA and National Consumer Credit Protection Act 2009.
+                  <h2 className="text-lg font-medium text-white">{t('accountsTitle', 'Verified Credit & Utility Accounts')}</h2>
+                  <p className="text-xs text-[#999999]">
+                    {locale === 'ne'
+                      ? 'नेपाल राष्ट्र बैंकबाट अनुमतिप्राप्त बैंकहरू तथा आधिकारिक सार्वजनिक उपयोगिता प्रदायकहरूबाट प्रमाणित खाताहरू।'
+                      : 'Verified accounts reported by licensed BFIs and public utilities under Nepal credit reporting directives.'}
                   </p>
                 </div>
-                <span className="text-xs text-[var(--cds-text-secondary)]">
-                  Total Lines: 4 (3 Active, 1 Closed)
+                <span className="text-xs text-[#999999]">
+                  Total: 5 Verified Facilities
                 </span>
               </div>
 
               <div
-                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                className="border border-[#202026] overflow-x-auto rounded-[2px]"
                 tabIndex={0}
                 role="region"
-                aria-label="Active Credit Accounts and CCR Tradelines Table"
+                aria-label="Verified Credit & Utility Accounts Table"
               >
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
-                      <th className="p-3">Credit Provider</th>
-                      <th className="p-3 font-mono">Account Number</th>
-                      <th className="p-3">Account Type</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3 text-right font-mono">Credit Limit</th>
-                      <th className="p-3 text-right font-mono">Current Balance</th>
-                      <th className="p-3 text-right font-mono">Monthly Payment</th>
-                      <th className="p-3 font-mono">Opened</th>
-                      <th className="p-3">Actions</th>
+                    <tr className="bg-[#1c1c21] border-b border-[#202026] text-[#999999] uppercase text-[11px] tracking-wider">
+                      <th className="p-3">{locale === 'ne' ? 'प्रदायक संस्था' : 'Provider'}</th>
+                      <th className="p-3 font-mono">{locale === 'ne' ? 'खाता / ग्राहक नम्बर' : 'Account / Meter'}</th>
+                      <th className="p-3">{locale === 'ne' ? 'प्रकार' : 'Facility Type'}</th>
+                      <th className="p-3">{locale === 'ne' ? 'स्थिति' : 'Status'}</th>
+                      <th className="p-3 text-right font-mono">{locale === 'ne' ? 'स्वीकृत सीमा' : 'Credit Limit'}</th>
+                      <th className="p-3 text-right font-mono">{locale === 'ne' ? 'बाँकी बक्यौता' : 'Current Balance'}</th>
+                      <th className="p-3 text-right font-mono">{locale === 'ne' ? 'मासिक भुक्तानी' : 'Monthly Bill/EMI'}</th>
+                      <th className="p-3">{locale === 'ne' ? 'कार्य' : 'Actions'}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                    {rhiAccounts.map(acc => (
-                      <tr key={acc.id} className="hover:bg-[var(--cds-layer-02)] transition-colors">
+                  <tbody className="divide-y divide-[#202026]">
+                    {accountsData.map(acc => (
+                      <tr key={acc.id} className="hover:bg-[#1c1c21] transition-colors">
                         <td className="p-3 font-medium text-white">{acc.provider}</td>
                         <td className="p-3 font-mono text-[#c6c6c6]">{acc.accountNumber}</td>
-                        <td className="p-3 text-[var(--cds-text-secondary)]">{acc.type}</td>
+                        <td className="p-3 text-[#999999]">{acc.type}</td>
                         <td className="p-3">
-                          <Tag type={acc.status.includes('OPEN') ? 'green' : 'gray'} size="sm" className="m-0 font-mono">
+                          <Tag type="green" size="sm" className="m-0 font-mono">
                             {acc.status.split(' ')[0]}
                           </Tag>
                         </td>
-                        <td className="p-3 text-right font-mono text-[#c6c6c6]">${acc.limit.toLocaleString()}</td>
-                        <td className="p-3 text-right font-mono font-bold text-white">${acc.balance.toLocaleString()}</td>
-                        <td className="p-3 text-right font-mono text-[#c6c6c6]">{acc.minDue}</td>
-                        <td className="p-3 font-mono text-[var(--cds-text-helper)]">{acc.opened}</td>
+                        <td className="p-3 text-right font-mono text-[#c6c6c6]">
+                          {formatCurrency(acc.limit, locale)}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-white">
+                          {formatCurrency(acc.balance, locale)}
+                        </td>
+                        <td className="p-3 text-right font-mono text-[#c6c6c6]">
+                          {formatCurrency(acc.monthlyPayment, locale)}
+                        </td>
                         <td className="p-3">
                           <button
                             onClick={() => setIsDisputeModalOpen(true)}
-                            className="text-[var(--cds-link-primary)] hover:underline"
+                            className="text-[#0f62fe] hover:underline"
                           >
-                            Dispute
+                            {locale === 'ne' ? 'उजुरी' : 'Dispute'}
                           </button>
                         </td>
                       </tr>
@@ -851,27 +1007,31 @@ export default function CreditReportPage() {
               </div>
             </TabPanel>
 
-            {/* TAB 4: PUBLIC RECORDS & DEFAULTS */}
+            {/* TAB 4: BLACKLIST & ADVERSE RECORDS */}
             <TabPanel className="p-5 md:p-6 space-y-6">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-lg font-medium text-white">Default Listings & Adverse Credit Infringements</h2>
-                  <Tag type="red" size="sm" className="font-mono m-0">1 Active Listing</Tag>
+                  <h2 className="text-lg font-medium text-white">
+                    {t('blacklistAdverse', 'Blacklist / Adverse Records')}
+                  </h2>
+                  <Tag type="purple" size="sm" className="font-mono m-0">१ विवादित प्रविष्टि (1 Disputed)</Tag>
                 </div>
-                <p className="text-xs text-[var(--cds-text-secondary)] mb-4">
-                  Under s6Q and s21D of the Privacy Act 1988, consumer defaults are accepted only if debt &ge; $150 and &ge; 60 days overdue, with statutory 30-day notice served.
+                <p className="text-xs text-[#999999] mb-4">
+                  {locale === 'ne'
+                    ? 'नेपाल राष्ट्र बैंकको कालोसूची तथा उपयोगिता बक्यौता सम्बन्धी अभिलेख। वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५ को दफा १२ बमोजिम पुनरावलोकनमा रहेको।'
+                    : 'Records governed under NRB Credit Information Directives and Section 12 of Nepal Individual Privacy Act 2018.'}
                 </p>
 
-                <div className="border border-[var(--cds-border-subtle)] bg-[var(--cds-layer-02)] p-4">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--cds-border-subtle)] pb-4 mb-4">
+                <div className="border border-[#202026] bg-[#1c1c21] p-4 rounded-[2px]">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#202026] pb-4 mb-4">
                     <div>
                       <div className="flex items-center gap-3">
-                        <h4 className="text-base font-bold text-white">Telstra Consumer Telecommunications</h4>
-                        <Tag type="red" size="sm" className="font-mono m-0">SECTION 21D DEFAULT</Tag>
-                        <Tag type="purple" size="sm" className="font-mono m-0">DISPUTED (Sec 20V)</Tag>
+                        <h4 className="text-base font-bold text-white">Kathmandu Upatyaka Khanepani Limited (KUKL)</h4>
+                        <Tag type="red" size="sm" className="font-mono m-0">METER VARIANCE</Tag>
+                        <Tag type="purple" size="sm" className="font-mono m-0">DISPUTED (दफा १२)</Tag>
                       </div>
-                      <div className="text-xs text-[var(--cds-text-secondary)] mt-1">
-                        Listing Ref: <span className="font-mono">DEF-TEL-2024-881</span> &bull; Original Account: <span className="font-mono">TEL-883192-NSW</span>
+                      <div className="text-xs text-[#999999] mt-1">
+                        Listing Ref: <span className="font-mono">DEF-KUKL-2024-881</span> &bull; Consumer Meter: <span className="font-mono">KUKL-KTM-04821</span>
                       </div>
                     </div>
 
@@ -879,237 +1039,105 @@ export default function CreditReportPage() {
                       <Button
                         size="sm"
                         kind="tertiary"
-                        onClick={() => alert("Viewing dispute investigation document pack...")}
+                        onClick={() => alert("Viewing dispute investigation document pack under Section 12...")}
                         className="text-xs"
                       >
-                        Dispute Docket (SLA: 12d)
+                        {locale === 'ne' ? 'उजुरी मिसिल (SLA: १२ दिन)' : 'Dispute Docket (SLA: 12d)'}
                       </Button>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                     <div>
-                      <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">ORIGINAL DEFAULT AMOUNT:</span>
-                      <span className="font-mono text-white font-bold text-base">$420.00 AUD</span>
+                      <span className="text-[#777777] block text-[10px] uppercase font-semibold">CONTESTED AMOUNT:</span>
+                      <span className="font-mono text-white font-bold text-base">
+                        {formatCurrency(12500, locale)}
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">DATE DEFAULT RECORDED:</span>
-                      <span className="font-mono text-white">2024-02-14</span>
+                      <span className="text-[#777777] block text-[10px] uppercase font-semibold">RECORDED DATE:</span>
+                      <span className="font-mono text-white">
+                        {formatDualDate('2024-02-10', locale)}
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">DAYS OVERDUE AT LISTING:</span>
-                      <span className="text-white">74 Days (&ge;60d met)</span>
+                      <span className="text-[#777777] block text-[10px] uppercase font-semibold">STATUTORY BASIS:</span>
+                      <span className="text-white">Section 12, Privacy Act 2018</span>
                     </div>
                     <div>
-                      <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase font-semibold">RETENTION EXPIRY (5 YEARS):</span>
-                      <span className="font-mono text-white">2029-02-14</span>
+                      <span className="text-[#777777] block text-[10px] uppercase font-semibold">STATUS:</span>
+                      <span className="font-mono text-[#0f62fe] font-bold">UNDER INVESTIGATION</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Court Writs & Judgments */}
+              {/* NRB Blacklist Standing */}
               <div>
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-white mb-2">
-                  Court Writs & Public Judgments
+                  {locale === 'ne' ? 'नेपाल राष्ट्र बैंक / कर्जा सूचना केन्द्र (CIC) कालोसूची स्थिति' : 'Nepal Rastra Bank / CIC Blacklist Verification'}
                 </h4>
-                <div className="border border-[var(--cds-border-subtle)] bg-[var(--cds-layer-02)] p-4 text-xs flex items-center justify-between">
+                <div className="border border-[#202026] bg-[#1c1c21] p-4 text-xs flex items-center justify-between rounded-[2px]">
                   <div className="flex items-center gap-3">
-                    <CheckmarkOutline className="text-[#42be65]" size={18} />
+                    <CheckmarkOutline className="text-[#24a148]" size={18} />
                     <div>
-                      <span className="text-white font-medium">No Court Writs or Judgments Recorded</span>
-                      <span className="text-[var(--cds-text-helper)] block text-[11px] mt-0.5">
-                        Scanned against Federal, Supreme, District, and Local Court Registries nationwide.
+                      <span className="text-white font-medium">
+                        {locale === 'ne' ? 'कालोसूचीमा कुनै विवरण नरहेको (स्वच्छ वित्तीय अभिलेख)' : 'Clean Record: Not on NRB / CIC Blacklist'}
+                      </span>
+                      <span className="text-[#777777] block text-[11px] mt-0.5">
+                        {locale === 'ne' ? 'नेपाल राष्ट्र बैंकको कर्जा सूचना केन्द्रमा कुनै कालोसूची वा डिफल्ट प्रविष्टि छैन।' : 'Verified across NRB Credit Information Centre databases nationwide.'}
                       </span>
                     </div>
                   </div>
-                  <span className="text-[#42be65] font-mono font-bold">CLEARED</span>
-                </div>
-              </div>
-
-              {/* Insolvency & Bankruptcy (NPII) */}
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-white mb-2">
-                  National Personal Insolvency Index (NPII)
-                </h4>
-                <div className="border border-[var(--cds-border-subtle)] bg-[var(--cds-layer-02)] p-4 text-xs flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <CheckmarkOutline className="text-[#42be65]" size={18} />
-                    <div>
-                      <span className="text-white font-medium">Nil Bankruptcy or Insolvency Proceedings</span>
-                      <span className="text-[var(--cds-text-helper)] block text-[11px] mt-0.5">
-                        No Part IV (Bankruptcy), Part IX (Debt Agreement), or Part X (Personal Insolvency) recorded.
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[#42be65] font-mono font-bold">CLEARED</span>
+                  <span className="text-[#24a148] font-mono font-bold">CLEARED (कालोसूचीमुक्त)</span>
                 </div>
               </div>
             </TabPanel>
 
-            {/* TAB 5: INQUIRIES & VELOCITY */}
-            <TabPanel className="p-5 md:p-6">
+            {/* TAB 5: INQUIRIES & AUDIT LOG */}
+            <TabPanel className="p-5 md:p-6 space-y-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-medium text-white">Credit Inquiries Register</h2>
-                  <p className="text-xs text-[var(--cds-text-secondary)]">
-                    Audit of credit provider access requests in the previous 5 years under Australian Privacy Principle 12.
+                  <h2 className="text-lg font-medium text-white">{t('enquiryLogTitle', 'Statutory Access & Enquiry Audit Log')}</h2>
+                  <p className="text-xs text-[#999999]">
+                    {locale === 'ne'
+                      ? 'वैयक्तिक गोपनीयता ऐन, २०७५ बमोजिम तपाईंको कर्जा फाइलमा गरिएको प्रत्येक सोधपुछको अडिट विवरण।'
+                      : 'Audit of all authorized credit inquiries and file disclosures logged in the immutable audit ledger.'}
                   </p>
                 </div>
-                <Tag type="blue" size="sm" className="font-mono m-0">3 Hard Enquiries (12m)</Tag>
+                <Tag type="blue" size="sm" className="font-mono m-0">2 Inquiries (12m)</Tag>
               </div>
 
               <div
-                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
+                className="border border-[#202026] overflow-x-auto rounded-[2px]"
                 tabIndex={0}
                 role="region"
                 aria-label="Credit Inquiries Register Table"
               >
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
-                      <th className="p-3 font-mono">Inquiry Date</th>
-                      <th className="p-3">Inquiring Entity</th>
-                      <th className="p-3">Facility Applied For</th>
-                      <th className="p-3">Inquiry Type</th>
-                      <th className="p-3 text-right font-mono">Requested Amount</th>
-                      <th className="p-3 font-mono">Score Impact</th>
+                    <tr className="bg-[#1c1c21] border-b border-[#202026] text-[#999999] uppercase text-[11px] tracking-wider">
+                      <th className="p-3 font-mono">{t('enquiryDate', 'Enquiry Timestamp')}</th>
+                      <th className="p-3">{t('enquirySubscriber', 'Inquiring Institution')}</th>
+                      <th className="p-3">{t('enquiryPurpose', 'Statutory Purpose')}</th>
+                      <th className="p-3">{t('enquiryRef', 'Reference ID')}</th>
+                      <th className="p-3 font-mono">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                    {liveReport?.enquiries && liveReport.enquiries.length > 0 ? (
-                      liveReport.enquiries.map((enq: any) => (
-                        <tr key={enq.id} className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                          <td className="p-3 font-mono text-white">
-                            {enq.created_at ? enq.created_at.slice(0, 10) : '2026-09-22'}
-                          </td>
-                          <td className="p-3 font-medium text-white">
-                            {enq.user_id || 'Subscriber / Credit Provider'}
-                          </td>
-                          <td className="p-3 text-[var(--cds-text-secondary)]">
-                            {enq.reason || 'Comprehensive Credit Assessment'}
-                          </td>
-                          <td className="p-3">
-                            <Tag type="purple" size="sm" className="m-0 font-mono">
-                              CREDIT INQUIRY
-                            </Tag>
-                          </td>
-                          <td className="p-3 text-right font-mono text-[#c6c6c6] font-bold">
-                            {enq.id.slice(0, 12)}
-                          </td>
-                          <td className="p-3 font-mono text-[#42be65] font-bold">
-                            Logged (Part IIIA)
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                        <td className="p-3 font-mono text-white">2026-09-22</td>
-                        <td className="p-3 font-medium text-white">Subject Self-Check</td>
-                        <td className="p-3 text-[var(--cds-text-secondary)]">Consumer Access Assessment</td>
-                        <td className="p-3"><Tag type="gray" size="sm" className="m-0 font-mono">SOFT INQUIRY</Tag></td>
-                        <td className="p-3 text-right font-mono text-[#8d8d8d]">N/A</td>
-                        <td className="p-3 font-mono text-[#42be65] font-bold">0 pts</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </TabPanel>
-
-            {/* TAB 6: HARDSHIP (PART IIIA) */}
-            <TabPanel className="p-5 md:p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-medium text-white mb-2">Financial Hardship Arrangements (Section 21QA)</h2>
-                <div className="mb-4">
-                  <InlineNotification
-                    kind="info"
-                    title="Strict Privacy Act 1988 Compliance Rule"
-                    subtitle="Under Australian Privacy Act Part IIIA s21QA, Financial Hardship Information (Code A: Temporary Relief or Code V: Variation) is strictly excluded from scoring algorithms. Hardship cannot reduce credit scores."
-                    lowContrast
-                  />
-                </div>
-
-                <div className="border border-[var(--cds-border-subtle)] bg-[var(--cds-layer-02)] p-4 text-xs">
-                  <div className="flex items-center justify-between pb-3 border-b border-[var(--cds-border-subtle)] mb-3">
-                    <span className="text-white font-bold">Active Financial Hardship Status:</span>
-                    <Tag type="green" size="sm" className="m-0 font-mono">NO ACTIVE HARDSHIP</Tag>
-                  </div>
-                  <div className="text-[var(--cds-text-secondary)] space-y-2 leading-relaxed">
-                    <p>
-                      Historical Record: Subject previously utilized a 3-month Temporary Relief arrangement (Code A) with National Australia Bank in Q1 2023 following temporary medical leave. The arrangement concluded on 2023-04-30 with all subsequent obligations satisfied in full.
-                    </p>
-                    <p className="text-[var(--cds-text-helper)] font-mono text-[11px]">
-                      Statutory retention period for completed Financial Hardship Information is 12 months. Record expunged from subscriber view 2024-04-30.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </TabPanel>
-
-            {/* TAB 7: BITEMPORAL AUDIT LEDGER */}
-            <TabPanel className="p-5 md:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-medium text-white">Bitemporal Ledger & Cryptographic Verification</h2>
-                  <p className="text-xs text-[var(--cds-text-secondary)]">
-                    Append-only ledger separating Valid Time (when event occurred) from Transaction Time (when bureau recorded it). Never overwritten.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-[#42be65] bg-[#0e2a15] px-3 py-1 border border-[#24a148] font-mono">
-                  <CheckmarkOutline size={14} /> LEDGER INTEGRITY VALIDATED
-                </div>
-              </div>
-
-              <div
-                className="border border-[var(--cds-border-subtle)] overflow-x-auto"
-                tabIndex={0}
-                role="region"
-                aria-label="Bitemporal Audit Ledger Table"
-              >
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-[var(--cds-layer-02)] border-b border-[var(--cds-border-subtle)] text-[var(--cds-text-secondary)] uppercase text-[11px] tracking-wider">
-                      <th className="p-3 font-mono">Event ID</th>
-                      <th className="p-3">Event Type</th>
-                      <th className="p-3 font-mono">Valid Time (Real-world)</th>
-                      <th className="p-3 font-mono">Transaction Time (Bureau)</th>
-                      <th className="p-3 font-mono">Author Entity</th>
-                      <th className="p-3 font-mono">SHA-256 State Hash</th>
+                  <tbody className="divide-y divide-[#202026]">
+                    <tr>
+                      <td className="p-3 font-mono text-white">{formatDualDate('2026-08-30', locale)}</td>
+                      <td className="p-3 font-medium text-white">Nabil Bank Limited (Class A BFI)</td>
+                      <td className="p-3 text-[#999999]">Housing Loan Credit Assessment</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">ENQ-NBL-2083-91</td>
+                      <td className="p-3 font-mono text-[#24a148] font-bold">LOGGED (दफा १२)</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--cds-border-subtle)]">
-                    <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                      <td className="p-3 font-mono text-[var(--cds-link-primary)]">EVT-90421-A</td>
-                      <td className="p-3 font-medium text-white">RHI_BATCH_APPEND</td>
-                      <td className="p-3 font-mono text-[#c6c6c6]">2026-09-01 00:00:00</td>
-                      <td className="p-3 font-mono text-[#c6c6c6]">2026-09-04 14:22:05</td>
-                      <td className="p-3 font-mono text-[var(--cds-text-secondary)]">PRV-CBA-001</td>
-                      <td className="p-3 font-mono text-[var(--cds-text-helper)] truncate max-w-xs">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
-                    </tr>
-                    <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                      <td className="p-3 font-mono text-[var(--cds-link-primary)]">EVT-89212-D</td>
-                      <td className="p-3 font-medium text-white">DISPUTE_RAISED</td>
-                      <td className="p-3 font-mono text-[#c6c6c6]">2026-08-19 09:11:00</td>
-                      <td className="p-3 font-mono text-[#c6c6c6]">2026-08-19 09:11:02</td>
-                      <td className="p-3 font-mono text-[var(--cds-text-secondary)]">SUB-IND-8842</td>
-                      <td className="p-3 font-mono text-[var(--cds-text-helper)] truncate max-w-xs">8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4</td>
-                    </tr>
-                    <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                      <td className="p-3 font-mono text-[var(--cds-link-primary)]">EVT-71829-M</td>
-                      <td className="p-3 font-medium text-white">MORTGAGE_REPORTED</td>
-                      <td className="p-3 font-mono text-[#c6c6c6]">2026-08-01 00:00:00</td>
-                      <td className="p-3 font-mono text-[#c6c6c6]">2026-08-03 11:04:12</td>
-                      <td className="p-3 font-mono text-[var(--cds-text-secondary)]">PRV-NAB-002</td>
-                      <td className="p-3 font-mono text-[var(--cds-text-helper)] truncate max-w-xs">ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb</td>
-                    </tr>
-                    <tr className="hover:bg-[var(--cds-layer-02)] transition-colors">
-                      <td className="p-3 font-mono text-[var(--cds-link-primary)]">EVT-64210-F</td>
-                      <td className="p-3 font-medium text-white">DEFAULT_LISTED</td>
-                      <td className="p-3 font-mono text-[#c6c6c6]">2024-02-14 09:00:00</td>
-                      <td className="p-3 font-mono text-[#c6c6c6]">2024-02-14 09:30:18</td>
-                      <td className="p-3 font-mono text-[var(--cds-text-secondary)]">PRV-TEL-049</td>
-                      <td className="p-3 font-mono text-[var(--cds-text-helper)] truncate max-w-xs">3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d</td>
+                    <tr>
+                      <td className="p-3 font-mono text-white">{formatDualDate('2026-09-22', locale)}</td>
+                      <td className="p-3 font-medium text-white">Subject Self-Check (नागरिक स्व-जाँच)</td>
+                      <td className="p-3 text-[#999999]">Consumer Access Assessment</td>
+                      <td className="p-3 font-mono text-[#c6c6c6]">ENQ-SELF-2083-01</td>
+                      <td className="p-3 font-mono text-[#24a148] font-bold">LOGGED (Soft Pull)</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1119,63 +1147,67 @@ export default function CreditReportPage() {
         </Tabs>
       </div>
 
-      {/* Formal Dispute Modal (Section 20V) */}
+      {/* Formal Dispute Modal (Nepal Individual Privacy Act 2018 Section 12) */}
       <Modal
         open={isDisputeModalOpen}
-        modalHeading="Lodge Formal Dispute (Privacy Act 1988 Part IIIA s20V)"
-        primaryButtonText="Submit Dispute Docket"
-        secondaryButtonText="Cancel"
+        modalHeading={locale === 'ne' ? "कर्जा तथा महशुल विवरण पुनरावलोकन निवेदन (दफा १२)" : "Lodge Formal Dispute (Nepal Individual Privacy Act 2018 Section 12)"}
+        primaryButtonText={t('submitDispute', 'Submit Formal Dispute')}
+        secondaryButtonText={t('cancel', 'Cancel')}
         onRequestClose={() => setIsDisputeModalOpen(false)}
         onRequestSubmit={handleDisputeSubmit}
         size="md"
       >
         <div className="space-y-4 text-xs">
-          <p className="text-[var(--cds-text-secondary)] leading-relaxed">
-            Submitting a dispute requires the credit bureau and credit provider to conduct an investigation within the statutory 30-day SLA. The contested listing is immediately flagged as disputed on all bureau subscriber queries.
+          <p className="text-[#999999] leading-relaxed">
+            {t('disputeNotice')}
           </p>
 
           <div>
-            <label className="block text-xs font-semibold text-white mb-1">Target Account / Listing</label>
-            <select
-              value={disputeTarget}
-              onChange={(e) => setDisputeTarget(e.target.value)}
-              className="w-full bg-[var(--cds-field)] text-white text-xs p-2 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
-            >
-              <option value="DEF-TEL-2024-881">Telstra Consumer Default ($420.00)</option>
-              <option value="ACC-CBA-9921">Commonwealth Bank Credit Card (••••-9921)</option>
-              <option value="ACC-NAB-1002">National Australia Bank Mortgage (••••-1002)</option>
-              <option value="INQ-MAC-2026">Macquarie Bank Hard Inquiry ($720,000)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-white mb-1">Statutory Grounds for Dispute</label>
+            <label className="block text-xs font-semibold text-white mb-1">{t('disputeReason', 'Reason for Dispute')}</label>
             <select
               value={disputeReason}
               onChange={(e) => setDisputeReason(e.target.value)}
-              className="w-full bg-[var(--cds-field)] text-white text-xs p-2 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
+              className="w-full bg-[#0b0b0d] text-white text-xs p-2 border border-[#202026] focus:border-[#0f62fe] focus:outline-none rounded-[2px]"
             >
-              <option value="NOTICE_NOT_RECEIVED">Section 6Q / 21D Statutory Notices Not Received</option>
-              <option value="INCORRECT_BALANCE">Inaccurate Overdue Balance or Payment In Flight</option>
-              <option value="IDENTITY_FRAUD">Suspected Identity Fraud / Unauthorized Account</option>
-              <option value="HARDSHIP_OMISSION">Unacknowledged Hardship Arrangement Under s21QA</option>
+              <option value="METER_DISCREPANCY">{t('reasonMeterDiscrepancy', 'Utility meter reading or billing error')}</option>
+              <option value="NOTICE_NOT_RECEIVED">{t('reasonNoticeNotReceived', 'Pre-listing notification not received')}</option>
+              <option value="DEBT_SATISFIED">{t('reasonDebtSatisfied', 'Debt or invoice already settled in full')}</option>
+              <option value="IDENTITY_ERROR">{t('reasonIdentityError', 'Unauthorised or incorrect identity attribution')}</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-white mb-1">Statement of Facts & Evidence</label>
+            <label className="block text-xs font-semibold text-white mb-1">
+              {locale === 'ne' ? 'विवादित खाता वा प्रविष्टि' : 'Target Account / Listing'}
+            </label>
+            <select
+              value={disputeTarget}
+              onChange={(e) => setDisputeTarget(e.target.value)}
+              className="w-full bg-[#0b0b0d] text-white text-xs p-2 border border-[#202026] focus:border-[#0f62fe] focus:outline-none rounded-[2px]"
+            >
+              <option value="DEF-KUKL-2024-881">KUKL Water Utility Default (रु १२,५००)</option>
+              <option value="ACC-NEA-8821">Nepal Electricity Authority (Consumer 012.14.882)</option>
+              <option value="ACC-NTC-4412">Nepal Telecom FTTH Line (01-4489124)</option>
+              <option value="ACC-NABIL-9012">Nabil Bank Housing Loan (NBL-HL-082914-01)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-white mb-1">{t('disputeDetails', 'Supporting Grounds & Evidence')}</label>
             <textarea
               rows={4}
               value={disputeDetails}
               onChange={(e) => setDisputeDetails(e.target.value)}
-              placeholder="Detail the specific factual inaccuracies, reference numbers, or notice delivery defects..."
-              className="w-full bg-[var(--cds-field)] text-white text-xs p-2 border border-[var(--cds-border-subtle)] focus:border-[#0f62fe] focus:outline-none"
+              placeholder={locale === 'ne' ? 'विवरणमा देखिएको त्रुटि, मिटर रिडिङ्ग वा प्रमाणको विवरण यहाँ लेख्नुहोस्...' : 'Detail specific factual inaccuracies, reference numbers, or notice defects...'}
+              className="w-full bg-[#0b0b0d] text-white text-xs p-2 border border-[#202026] focus:border-[#0f62fe] focus:outline-none rounded-[2px]"
             />
           </div>
 
-          <div className="p-3 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)] text-[11px] text-[var(--cds-text-secondary)]">
-            <span className="text-white font-bold block mb-1">Legal Declaration:</span>
-            I certify that the representations made in this dispute filing are true and accurate under penalty of perjury and Section 20V of the Privacy Act 1988 (Cth).
+          <div className="p-3 bg-[#1c1c21] border border-[#202026] text-[11px] text-[#999999] rounded-[2px]">
+            <span className="text-white font-bold block mb-1">{locale === 'ne' ? 'कानुनी स्वघोषणा:' : 'Legal Declaration:'}</span>
+            {locale === 'ne'
+              ? 'म प्रमाणित गर्दछु कि यस उजुरीमा प्रस्तुत गरिएका सम्पूर्ण विवरणहरू सत्य छन्। वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५ को दफा १२ बमोजिम यो निवेदन पेश गरेको छु।'
+              : 'I certify that the statements provided in this dispute filing are true and accurate under Section 12 of the Nepal Individual Privacy Act 2018.'}
           </div>
         </div>
       </Modal>

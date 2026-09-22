@@ -14,14 +14,14 @@ Key Dependencies & Callers:
     - Triggered periodically via Celery Beat or ad-hoc by management scripts.
 
 Regulatory & Compliance Context:
-    - Privacy Act 1988 (Cth) Part IIIA Section 20W (Retention of Credit Information):
+    - Nepal Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५) & NRB Credit Information Directives:
       Mandates strict maximum retention periods; retaining records past these limits is an offence.
-      - Repayment History Information (RHI): 24 months max.
+      - Monthly Loan Repayment (RHI equivalent): 24 months max.
       - Default information: 5 years max.
-      - Serious Credit Infringement (unresolved): 7 years max.
-      - Serious Credit Infringement (resolved): Reverts to 5-year default expiration (Section 20U).
+      - NRB Blacklist records (unresolved): 7 years max.
+      - NRB Blacklist records (resolved): Reverts to 5-year default expiration.
       - Financial Hardship Information: 12 months max after agreement termination.
-    - Privacy Act 1988 Section 20V:
+    - Nepal Individual Privacy Act 2018 Section 12:
       Mandatory 30-day statutory investigation and resolution timeframe for credit disputes.
 """
 
@@ -118,7 +118,7 @@ def run_data_expiry_job():
 def check_dispute_sla_alerts():
     """Monitors open consumer disputes against the statutory 30-day resolution deadline.
 
-    Under Australian Privacy Act 1988 Section 20V, a credit reporting body must resolve
+    Under Nepal Individual Privacy Act 2018 Section 12, a credit reporting body must resolve
     disputes within 30 days of receipt. This task identifies disputes nearing the deadline
     (<= 5 days remaining) or in statutory breach (<= 0 days) and emits audit log alerts.
 
@@ -146,7 +146,7 @@ def check_dispute_sla_alerts():
         for d in disputes:
             lodged_at = d.created_at or now
             days_elapsed = (now - lodged_at).days
-            # REVIEW-LEGAL: Privacy Act 1988 s20V statutory 30-day investigation limit
+            # REVIEW-LEGAL: Nepal Individual Privacy Act 2018 Section 12 statutory 30-day investigation limit
             days_remaining = 30 - days_elapsed
 
             # REVIEW-ASSUMPTION: 5-day warning threshold gives risk analysts sufficient lead time to resolve files

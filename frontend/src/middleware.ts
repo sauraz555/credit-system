@@ -12,7 +12,7 @@
  *   Reads session cookies ('auth_token', 'auth_role') set during authentication.
  *
  * Legal / Regulatory:
- *   Privacy Act 1988 Part IIIA Section 20R: Prevents unauthorized consumer data exposure
+ *   Nepal Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५) and NRB Directives: Prevents unauthorized consumer data exposure
  *   by strictly isolating Subject, Provider, Analyst, and Administrator portal routes.
  */
 

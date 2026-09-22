@@ -11,8 +11,8 @@
  *   Interacts with backend auth endpoints (`/api/auth/login`, `/api/auth/mfa/verify`).
  *
  * Legal / Regulatory:
- *   APRA CPS 234 / NIST SP 800-63B: Mandates Multi-Factor Authentication (AAL2) for
- *   all privileged institutional personas (Admin, Analyst, Credit Provider).
+ *   Nepal Individual Privacy Act 2018 and NRB IT Guidelines: Mandates Multi-Factor Authentication
+ *   for privileged institutional personas (Admin, Analyst, Credit Provider).
  */
 
 "use client";
@@ -28,13 +28,13 @@ import {
 } from '@carbon/react';
 import { Login, Reset, Security } from '@carbon/icons-react';
 import { API_BASE, checkBackendHealth } from '@/lib/api';
+import { useTranslations } from '@/lib/i18n';
 
 /**
  * Inner login form component managing interactive credential inputs, TOTP challenges, and session cookies.
- *
- * @returns JSX.Element rendering login inputs, MFA challenge modal, or quick testing persona tiles.
  */
 function LoginForm() {
+  const t = useTranslations('login');
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect') || '';
@@ -60,7 +60,6 @@ function LoginForm() {
   }, []);
 
   const setAuthCookies = (token: string, role: string) => {
-    // 7 days expiration
     const maxAge = 7 * 24 * 60 * 60;
     document.cookie = `auth_token=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
     document.cookie = `auth_role=${role}; path=/; max-age=${maxAge}; SameSite=Lax`;
@@ -86,9 +85,9 @@ function LoginForm() {
       if (data.mfa_required) {
         setMfaToken(data.mfa_token || data.temp_token);
         setPendingUser(data.user);
-        if (data.user?.email === 'admin@example.com' || data.user?.email === 'admin@bureau.gov.au') setMfaSecretHint('MRYYKLJ3GNBXCF3JLRIBHR6QV4IFLCN2');
-        else if (data.user?.email === 'analyst@example.com' || data.user?.email === 'analyst@bureau.gov.au') setMfaSecretHint('WLNJMOIXHFS442MVSNNA5WQJE74JWV3I');
-        else if (data.user?.email === 'provider@example.com' || data.user?.email === 'provider@cba.com.au') setMfaSecretHint('FKH56R4XUAXHWHFGNX3QE5TY6KFOOMOH');
+        if (data.user?.email === 'admin@example.com' || data.user?.email === 'admin@creditreporting.gov.np') setMfaSecretHint('MRYYKLJ3GNBXCF3JLRIBHR6QV4IFLCN2');
+        else if (data.user?.email === 'analyst@example.com' || data.user?.email === 'analyst@creditreporting.gov.np') setMfaSecretHint('WLNJMOIXHFS442MVSNNA5WQJE74JWV3I');
+        else if (data.user?.email === 'provider@example.com' || data.user?.email === 'provider@nabilbank.com') setMfaSecretHint('FKH56R4XUAXHWHFGNX3QE5TY6KFOOMOH');
         setIsLoading(false);
         return;
       }
@@ -152,7 +151,7 @@ function LoginForm() {
           target = '/provider';
           break;
         case 'SUBJECT':
-          target = data.user.entity_id ? `/subject/${data.user.entity_id}` : '/subject/IND-8842-1994';
+          target = data.user.entity_id ? `/subject/${data.user.entity_id}` : '/subject/CIT-27-01-78-04821';
           break;
         default:
           target = '/';
@@ -176,12 +175,12 @@ function LoginForm() {
       {/* Page Title & Subtitle */}
       <div className="mb-6">
         <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
-          {mfaToken ? 'Two-Factor Verification' : 'Sign in'}
+          {mfaToken ? t('mfaTitle', 'Two-Factor Verification') : t('title', 'Sign In')}
         </h1>
         <p className="text-xs text-[#999999] mt-1">
           {mfaToken
-            ? `Enter the 6-digit Time-based One-Time Password (TOTP) from your authenticator device for ${pendingUser?.email}.`
-            : 'Enter your credentials to access the Credit Reporting Mechanism.'}
+            ? t('mfaSubtitle', 'Enter the 6-digit Time-based One-Time Password (TOTP) from your authenticator device.')
+            : t('subtitle', 'Enter your credentials to access the Credit Reporting Mechanism.')}
         </p>
       </div>
 
@@ -222,8 +221,8 @@ function LoginForm() {
         <form onSubmit={handleLoginSubmit} className="space-y-4">
           <TextInput
             id="login-email"
-            labelText="Corporate Email Address"
-            placeholder="name@bureau.gov.au"
+            labelText={t('email', 'Email Address')}
+            placeholder={t('emailPlaceholder', 'user@example.com')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -231,7 +230,7 @@ function LoginForm() {
           />
           <PasswordInput
             id="login-password"
-            labelText="Argon2 Password"
+            labelText={t('password', 'Password')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -245,7 +244,7 @@ function LoginForm() {
               disabled={isLoading || !email || !password}
               className="w-full"
             >
-              {isLoading ? 'Verifying...' : 'Sign In'}
+              {isLoading ? t('verifying', 'Verifying...') : t('submit', 'Sign In')}
             </Button>
           </div>
         </form>
@@ -253,7 +252,7 @@ function LoginForm() {
         <form onSubmit={handleMfaSubmit} className="space-y-4">
           <TextInput
             id="mfa-code"
-            labelText="6-Digit Authenticator Code"
+            labelText={t('totpCode', '6-Digit Authenticator Code')}
             placeholder="123456"
             value={totpCode}
             maxLength={6}
@@ -277,7 +276,7 @@ function LoginForm() {
               disabled={isLoading || totpCode.trim().length !== 6}
               className="flex-1"
             >
-              {isLoading ? 'Verifying...' : 'Verify MFA'}
+              {isLoading ? t('verifying', 'Verifying...') : t('verifyMfa', 'Verify MFA')}
             </Button>
             <Button
               kind="secondary"
@@ -288,7 +287,7 @@ function LoginForm() {
               }}
               disabled={isLoading}
             >
-              Cancel
+              {t('cancel', 'Cancel')}
             </Button>
           </div>
         </form>
@@ -297,7 +296,7 @@ function LoginForm() {
       {/* Quick-Fill Seed Accounts */}
       <div className="mt-8 pt-6 border-t border-[#202026]">
         <span className="text-[11px] uppercase text-[#999999] font-medium tracking-wider block mb-3">
-          Quick Test Persona Accounts:
+          {t('testPersonas', 'Quick Test Persona Accounts:')}
         </span>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div 
@@ -305,7 +304,7 @@ function LoginForm() {
             className="p-2.5 bg-[#141417] hover:bg-[#1c1c21] cursor-pointer border border-[#202026] rounded-[2px] transition-colors"
           >
             <div className="flex justify-between items-center">
-              <span className="font-medium text-[#e6e6e6]">Admin</span>
+              <span className="font-medium text-[#e6e6e6]">{t('personaAdmin', 'Admin')}</span>
               <Tag type="red" size="sm">ADMIN</Tag>
             </div>
             <div className="text-[10px] text-[#999999] font-mono mt-1">
@@ -318,7 +317,7 @@ function LoginForm() {
             className="p-2.5 bg-[#141417] hover:bg-[#1c1c21] cursor-pointer border border-[#202026] rounded-[2px] transition-colors"
           >
             <div className="flex justify-between items-center">
-              <span className="font-medium text-[#e6e6e6]">Analyst</span>
+              <span className="font-medium text-[#e6e6e6]">{t('personaAnalyst', 'Analyst')}</span>
               <Tag type="purple" size="sm">ANALYST</Tag>
             </div>
             <div className="text-[10px] text-[#999999] font-mono mt-1">
@@ -331,7 +330,7 @@ function LoginForm() {
             className="p-2.5 bg-[#141417] hover:bg-[#1c1c21] cursor-pointer border border-[#202026] rounded-[2px] transition-colors"
           >
             <div className="flex justify-between items-center">
-              <span className="font-medium text-[#e6e6e6]">Provider (CBA)</span>
+              <span className="font-medium text-[#e6e6e6]">{t('personaProvider', 'Provider (Nabil Bank)')}</span>
               <Tag type="teal" size="sm">PROVIDER</Tag>
             </div>
             <div className="text-[10px] text-[#999999] font-mono mt-1">
@@ -344,7 +343,7 @@ function LoginForm() {
             className="p-2.5 bg-[#141417] hover:bg-[#1c1c21] cursor-pointer border border-[#202026] rounded-[2px] transition-colors"
           >
             <div className="flex justify-between items-center">
-              <span className="font-medium text-[#e6e6e6]">Subject (Vance)</span>
+              <span className="font-medium text-[#e6e6e6]">{t('personaSubject', 'Subject (Ram Kumar Shrestha)')}</span>
               <Tag type="blue" size="sm">SUBJECT</Tag>
             </div>
             <div className="text-[10px] text-[#999999] font-mono mt-1">
@@ -359,8 +358,6 @@ function LoginForm() {
 
 /**
  * Exported Login page wrapped in React Suspense boundary for client-side search parameter parsing.
- *
- * @returns JSX.Element rendering the suspended LoginForm component immediately.
  */
 export default function LoginPage() {
   return (

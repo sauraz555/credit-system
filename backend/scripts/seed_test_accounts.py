@@ -1,4 +1,4 @@
-"""Test account and RBAC credential seeding script.
+"""Test account and RBAC credential seeding script for Nepal Credit Reporting Mechanism.
 
 This module provisions standard testing accounts spanning all four system roles
 (ADMIN, ANALYST, PROVIDER, SUBJECT) with configured passwords and cryptographically
@@ -10,19 +10,19 @@ Architecture:
     Outputs dynamic credentials to TEST_ACCOUNTS.md.
 
 Legal / Regulatory:
-    Ensures role separation compliant with Privacy Act 1988 Part IIIA access controls,
-    establishing distinct test subjects and licensed provider tenants.
+    Ensures role separation compliant with Nepal Individual Privacy Act 2018
+    (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५) and Nepal Rastra Bank credit information
+    directives, establishing distinct test subjects and licensed BFI provider tenants.
 """
 
 import os
 import sys
 import pyotp
 
-# REVIEW-SECURITY: Ensure local application packages can be resolved
+# Ensure local application packages can be resolved
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# REVIEW-SECURITY: Data hygiene guardrail preventing accidental execution against production databases
-# Enforce environment guardrail
+# Data hygiene guardrail preventing accidental execution against production databases
 if os.getenv("ENVIRONMENT") != "development":
     raise RuntimeError(
         "CRMS Data Hygiene Guardrail Violation: Seed script execution rejected! "
@@ -38,7 +38,7 @@ def seed_accounts():
     """Provisions RBAC test accounts across all system personas with MFA secrets.
 
     Cleanses existing test accounts to avoid unique constraint violations, creates
-    associated individual entity 'IND-8842-1994' (Jonathan Vance) for subject testing,
+    associated individual entity 'CIT-27-01-78-04821' (Ram Kumar Shrestha) for subject testing,
     hashes passwords via Argon2id, commits records, and writes markdown credentials
     to TEST_ACCOUNTS.md.
 
@@ -47,23 +47,26 @@ def seed_accounts():
     """
     db = SessionLocal()
 
-    # Ensure Jonathan Vance exists so subject account has valid entity
-    # REVIEW-ASSUMPTION: IND-8842-1994 serves as the standard deterministic test persona across test suites
-    vance = db.query(Entity).filter(Entity.id == "IND-8842-1994").first()
-    if not vance:
-        vance = Entity(
-            id="IND-8842-1994",
+    ram_id = "CIT-27-01-78-04821"
+    ram = db.query(Entity).filter(Entity.id == ram_id).first()
+    if not ram:
+        ram = Entity(
+            id=ram_id,
             type=EntityTypeEnum.INDIVIDUAL,
-            identifier=encrypt_field("IND-8842-1994"),
-            identifier_blind_index=compute_blind_index("IND-8842-1994"),
+            identifier=encrypt_field(ram_id),
+            identifier_blind_index=compute_blind_index(ram_id),
             basic_info={
-                "first_name": "Jonathan",
-                "last_name": "Vance",
-                "dob": "1984-06-14",
-                "address": "42 Miller St, North Sydney NSW 2060"
+                "first_name": "राम कुमार (Ram Kumar)",
+                "last_name": "श्रेष्ठ (Shrestha)",
+                "citizenship_no": "२७-०१-७८-०४८२१ (27-01-78-04821)",
+                "national_id": "१०८-२९४-८१७२ (108-294-8172)",
+                "pan_number": "301982741",
+                "dob": "1984-05-28",
+                "address": "नयाँ बानेश्वर, काठमाडौँ (New Baneshwor, Kathmandu, Nepal)",
+                "phone": "+977 9851082914"
             }
         )
-        db.add(vance)
+        db.add(ram)
         db.commit()
 
     # Generate cryptographically random MFA secrets per seed run
@@ -99,7 +102,7 @@ def seed_accounts():
             "role": RoleEnum.PROVIDER,
             "totp_secret": provider_totp,
             "mfa_enabled": True,
-            "tenant_id": "PRV-CBA-001",
+            "tenant_id": "PRV-NABIL-001",
             "entity_id": None
         },
         {
@@ -110,15 +113,14 @@ def seed_accounts():
             "totp_secret": None,
             "mfa_enabled": False,
             "tenant_id": None,
-            "entity_id": "IND-8842-1994"
+            "entity_id": ram_id
         }
     ]
 
     # Cleanly remove any old test accounts to prevent duplicate id/email conflicts
     db.query(User).filter(
         User.email.in_([
-            "admin@example.com", "analyst@example.com", "provider@example.com", "subject@example.com",
-            "admin@bureau.gov.au", "analyst@bureau.gov.au", "provider@cba.com.au", "subject@consumer.gov.au"
+            "admin@example.com", "analyst@example.com", "provider@example.com", "subject@example.com"
         ]) | User.id.in_(["usr_admin_001", "usr_analyst_001", "usr_provider_001", "usr_subject_001"])
     ).delete(synchronize_session=False)
     db.commit()
@@ -151,10 +153,10 @@ def seed_accounts():
 
 | Role | Email | Password | MFA Enabled | TOTP Secret (Base32) | Associated ID | Access Level |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **ADMIN** | `admin@example.com` | `Sprint2026!Admin` | Yes | `{admin_totp}` | N/A | Full administrative control, model activation, user management, audit logging |
-| **ANALYST** | `analyst@example.com` | `Sprint2026!Analyst` | Yes | `{analyst_totp}` | N/A | Dispute investigations, back-testing, bitemporal historical file inspection |
-| **PROVIDER** | `provider@example.com` | `Sprint2026!Provider` | Yes | `{provider_totp}` | `PRV-CBA-001` | Data ingestion within licensed categories (RHI, accounts, defaults) |
-| **SUBJECT** | `subject@example.com` | `Sprint2026!Subject` | No | None | `IND-8842-1994` | Self-service consumer credit file, score breakdowns, enquiry history, dispute filing |
+| **ADMIN** | `admin@example.com` | `Sprint2026!Admin` | Yes | `{admin_totp}` | N/A | Full administrative control, model calibration, user management, audit logging |
+| **ANALYST** | `analyst@example.com` | `Sprint2026!Analyst` | Yes | `{analyst_totp}` | N/A | Dispute investigations under Nepal Privacy Act Sec 12, back-testing, bitemporal file inspection |
+| **PROVIDER** | `provider@example.com` | `Sprint2026!Provider` | Yes | `{provider_totp}` | `PRV-NABIL-001` | Data ingestion within licensed categories (Class A BFI, RHI, accounts, defaults) |
+| **SUBJECT** | `subject@example.com` | `Sprint2026!Subject` | No | None | `{ram_id}` | Self-service consumer credit file, 5-pillar score breakdowns, enquiry history, dispute filing |
 
 ---
 

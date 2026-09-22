@@ -1,10 +1,11 @@
-"""Statutory Dispute Resolution API Router (Privacy Act 1988 Part IIIA Section 20V).
+"""Statutory Dispute Resolution API Router (Nepal Individual Privacy Act 2018 Section 12).
 
-This router implements consumer dispute rights under Section 20V of the Australian
-Privacy Act 1988 (Cth). It enables consumer credit subjects to dispute inaccurate, incomplete,
-or out-of-date credit listings, tracks the mandatory 30-day statutory resolution countdown,
-flags disputed records on the ledger to prevent improper adverse scoring, provides adjudication
-tools for risk analysts to correct or uphold listings, and writes audit trail events for every decision.
+This router implements consumer dispute rights under Section 12 of the Nepal
+Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५). It enables consumer credit
+subjects to dispute inaccurate, incomplete, or unverified credit and utility listings,
+tracks statutory resolution deadlines, flags disputed records on the ledger to prevent
+improper adverse scoring, provides adjudication tools for risk analysts to correct or uphold listings,
+and writes audit trail events for every decision.
 
 Architecture Tier:
     API / Dispute Adjudication Layer (`backend/app/routers/`).
@@ -15,9 +16,10 @@ Key Dependencies & Callers:
       workspace (`/analyst`) to investigate and adjudicate dispute queues.
 
 Regulatory & Compliance Context:
-    - Privacy Act 1988 (Cth) Part IIIA Section 20V:
-      An individual has a statutory right to request correction of personal credit information.
-      The credit reporting body MUST investigate and resolve the correction request within 30 days.
+    - Nepal Individual Privacy Act 2018 (वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५) Section 12:
+      An individual has a statutory right to inspect, verify, and request correction or removal
+      of personal credit information.
+    - Nepal Rastra Bank Credit Information Directives.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -93,19 +95,19 @@ def list_disputes(
             else:
                 name = entity.identifier
                 
-        # REVIEW-LEGAL: Calculate 30-day statutory SLA countdown under Privacy Act 1988 s20V(3)
+        # REVIEW-LEGAL: Calculate 30-day statutory SLA countdown under Nepal Individual Privacy Act 2018 Section 12
         now = datetime.utcnow()
         elapsed_days = (now - (d.created_at or now)).days
         days_remaining = max(0, 30 - elapsed_days) if d.status == "OPEN" else 0
         
-        listing_desc = f"{ledger.record_type} (${ledger.amount or '0'})" if ledger else (d.ledger_record_id or "General Credit Listing")
+        listing_desc = f"{ledger.record_type} (NPR {ledger.amount or '0'})" if ledger else (d.ledger_record_id or "General Credit Listing")
         
         results.append({
             "id": d.id,
             "entity_id": d.entity_id,
             "subject_name": name,
             "target_listing": listing_desc,
-            "grounds": d.notes or "Section 6Q/21D notice non-compliance or accuracy contest",
+            "grounds": d.notes or "Section 12 statutory correction request or accuracy contest",
             "filed_date": d.created_at.strftime("%Y-%m-%d") if d.created_at else "2026-09-01",
             "days_remaining": days_remaining,
             "status": d.status,
@@ -121,7 +123,7 @@ def open_dispute(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Lodges a statutory dispute under Section 20V of the Privacy Act 1988 (Cth).
+    """Lodges a statutory dispute under Section 12 of the Nepal Individual Privacy Act 2018.
 
     Flags the contested credit ledger record as `DISPUTED` to ensure analytical transparency,
     records the event in `audit_log`, and initiates the 30-day statutory clock.
@@ -185,7 +187,7 @@ def open_dispute(
     # Commit audit log event
     audit = AuditLog(
         user_id=current_user.id,
-        action="CREATE_DISPUTE_SEC_20V",
+        action="CREATE_DISPUTE_SEC_12",
         target_table="disputes",
         target_id=dispute.id,
         after_state={"status": "OPEN", "ledger": ledger_id, "entity": actual_entity_id}
@@ -198,7 +200,7 @@ def open_dispute(
     return {
         "status": "success", 
         "dispute_id": dispute.id,
-        "message": "Dispute lodged under Section 20V of Privacy Act 1988 (Cth). Listing flagged DISPUTED."
+        "message": "Dispute lodged under Section 12 of Nepal Individual Privacy Act 2018. Listing flagged DISPUTED."
     }
 
 
