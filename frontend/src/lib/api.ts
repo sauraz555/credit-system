@@ -9,7 +9,7 @@
  *   Exported for use across all Next.js App Router client and server components.
  */
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 /**
  * Checks connectivity to the backend health endpoint.
@@ -19,7 +19,8 @@ export async function checkBackendHealth(): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
-    const res = await fetch(`${API_BASE}/health`, {
+    const url = API_BASE ? `${API_BASE}/health` : '/health';
+    const res = await fetch(url, {
       signal: controller.signal,
       cache: 'no-store'
     });
