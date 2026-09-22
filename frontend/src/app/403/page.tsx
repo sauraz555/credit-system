@@ -1,3 +1,21 @@
+/**
+ * HTTP 403 Forbidden / Insufficient Role Authorization View.
+ *
+ * Rendered when a logged-in user attempts to navigate to a portal zone outside their
+ * RBAC clearance (e.g., SUBJECT attempting to view /admin, or PROVIDER attempting to
+ * access analyst dispute queues). Provides clear explanatory context, session details,
+ * and options to return to safe routes or switch accounts.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Error / Access Denied Route).
+ *   Targeted by Next.js Edge Middleware redirects on role clearance mismatch.
+ *   Clears local storage and cookies if the user opts to re-authenticate.
+ *
+ * Legal / Regulatory:
+ *   Enforces Privacy Act 1988 Part IIIA mandatory data isolation, preventing accidental
+ *   or malicious cross-tenant / cross-role inspection of credit files.
+ */
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -5,6 +23,11 @@ import Link from 'next/link';
 import { Button, Tile, InlineNotification } from '@carbon/react';
 import { MisuseOutline, Logout, ArrowLeft } from '@carbon/icons-react';
 
+/**
+ * Access Denied error component for RBAC policy violations.
+ *
+ * @returns JSX.Element displaying 403 error tile, active session role, and recovery actions.
+ */
 export default function ForbiddenPage() {
   const [currentRole, setCurrentRole] = useState<string>('UNKNOWN');
 

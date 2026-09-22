@@ -1,3 +1,26 @@
+"""Comprehensive authentication, session security, and RBAC coverage test suite.
+
+Validates in-depth security mechanisms including:
+- Token expiration enforcement (401)
+- JWT signature tampering and algorithm confusion rejection
+- Missing claims rejection
+- Refresh token rotation (RTR) and token reuse detection (revoking family)
+- Explicit token revocation via logout blocklist
+- Brute-force lockout progression (5 failed attempts -> 15 min lock)
+- Time-based One-Time Password (TOTP) step-up enforcement
+- Comprehensive RBAC matrix across all roles and system routes
+
+Architecture:
+    Security & Cryptographic Verification Test Suite (Backend Tests).
+    Directly exercises `app.auth`, `app.routers.auth_router`, and dependency guards.
+    Executed during CI/CD security audits and penetration test verifications.
+
+Legal / Regulatory:
+    Complies with Australian Privacy Principles (APP 11: Security of personal information),
+    APRA Prudential Standard CPS 234 (Information Security), and NIST SP 800-63B
+    Digital Identity Guidelines.
+"""
+
 import pytest
 import time
 import os
@@ -22,6 +45,7 @@ client = TestClient(app)
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_test_entities():
+    """Initializes test models and subjects for comprehensive security validation."""
     init_db()
     db = SessionLocal()
     clear_lockouts_and_revocations()

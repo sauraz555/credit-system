@@ -1,10 +1,19 @@
-"""
-Load Testing Runner for CRMS Platform
+"""Load Testing Runner for CRMS Platform.
+
 Simulates concurrent load:
 - 50 Virtual Users executing Report Lookups
 - 20 Virtual Users executing Data Ingestion
 Rate limiting is raised/disabled for the test user via X-Benchmark-Test-User and user_id whitelist.
 Reports p50, p95, p99 latencies, error rate, and throughput (req/s).
+
+Architecture:
+    Performance Testing & Scalability Audit Suite (Root Scripts).
+    Depends on FastAPI TestClient, database models, session factory, and auth module.
+    Simulates high-throughput production burst scenarios.
+
+Legal / Regulatory:
+    Evaluates system stability and transaction atomicity under simultaneous multi-tenant
+    ingestion and regulatory subject report lookups.
 """
 
 import time
@@ -26,6 +35,7 @@ from app.models import User, RoleEnum
 client = TestClient(app)
 
 # Ensure load test user exists
+# REVIEW-SECURITY: Provision deterministic load testing user in local test database
 init_db()
 db = SessionLocal()
 test_user = db.query(User).filter(User.id == "load_test_user").first()
@@ -51,6 +61,7 @@ token = create_access_token({
     "tenant_id": "PRV-CBA-001"
 })
 
+# REVIEW-SECURITY: Rate limit bypass header strictly intended for isolated load testing suites
 HEADERS = {
     "Authorization": f"Bearer {token}",
     "X-Tenant-ID": "PRV-CBA-001",
@@ -58,6 +69,14 @@ HEADERS = {
 }
 
 def execute_lookup(vu_id: int):
+    """Simulates a single virtual user performing a bitemporal report query.
+
+    Args:
+        vu_id: Virtual user thread index.
+
+    Returns:
+        tuple[str, float, bool]: Operation type ('lookup'), duration in ms, and success status.
+    """
     # Lookup either Jonathan Vance or another seeded entity
     entity_id = "IND-8842-1994" if random.random() < 0.7 else "ACN-109-283-912"
     start = time.perf_counter()
@@ -71,6 +90,14 @@ def execute_lookup(vu_id: int):
         return "lookup", dur, False
 
 def execute_ingest(vu_id: int):
+    """Simulates a single virtual user ingesting a credit default ledger event.
+
+    Args:
+        vu_id: Virtual user thread index.
+
+    Returns:
+        tuple[str, float, bool]: Operation type ('ingest'), duration in ms, and success status.
+    """
     start = time.perf_counter()
     try:
         res = client.post(
@@ -97,6 +124,14 @@ def execute_ingest(vu_id: int):
         return "ingest", dur, False
 
 def run_benchmark(duration_seconds: int = 30):
+    """Executes high-concurrency load benchmark across lookups and ingestions.
+
+    Spawns worker pools simulating 50 lookup virtual users and 20 ingestion virtual
+    users over the designated test duration, collecting latency distribution metrics.
+
+    Args:
+        duration_seconds: Number of seconds to maintain load test execution.
+    """
     print(f"=== CRMS High-Concurrency Load Test ===")
     print(f"Configuration: 50 VUs (Report Lookups) + 20 VUs (Data Ingestion)")
     print(f"Target Duration: {duration_seconds} seconds")

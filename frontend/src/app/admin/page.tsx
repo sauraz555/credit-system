@@ -1,3 +1,22 @@
+/**
+ * Platform Governance, Model Calibration & Regulatory Dispute Console.
+ *
+ * Provides comprehensive supervisory administration over the Credit Reporting Mechanism:
+ * 1. Model Configuration: Adjusting, validating (sum=100%), and activating scoring versions (v1/v2).
+ * 2. Model Discrimination Backtesting: Evaluating AUC-ROC, Gini, and Kolmogorov-Smirnov statistics.
+ * 3. Section 20V Dispute Resolution: Tracking statutory 30-day investigation SLA countdowns and adjudicating claims.
+ * 4. Corporate Contagion Topology: Inspecting recursive director-company structural failure graphs.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Administrative & Supervisory Route).
+ *   Next.js client-side component ('use client') utilizing IBM Carbon Design System tabs and tables.
+ *   Interacts with backend admin endpoints (`/api/admin/models`, `/api/disputes`, `/api/admin/network`).
+ *
+ * Legal / Regulatory:
+ *   Privacy Act 1988 Part IIIA Section 20V (Statutory 30-day dispute turnaround timeframes),
+ *   APRA CPG 223 / CPS 220 (Prudential model governance and backtest validation standards).
+ */
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -27,6 +46,11 @@ import {
   Catalog
 } from '@carbon/icons-react';
 
+/**
+ * Enterprise Administration and Model Calibration Dashboard component.
+ *
+ * @returns JSX.Element rendering model weights tuner, backtest results, dispute queue, and director graphs.
+ */
 export default function AdminAnalystDashboard() {
   // Model weights state
   const [activeModel, setActiveModel] = useState<'v1' | 'v2'>('v1');

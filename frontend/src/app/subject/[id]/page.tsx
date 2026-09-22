@@ -1,3 +1,24 @@
+/**
+ * Comprehensive Consumer Credit File, Scoring Gauge & Dispute Portal.
+ *
+ * Primary consumer-facing and subscriber-facing credit file inspection interface featuring:
+ * 1. Bureau Score Gauge: 0-1000 qualitative risk band scoring with key positive/negative contributing factors.
+ * 2. 24-Month Repayment History Information (RHI): Statutory 24-month rolling calendar grid (0-24 codes, hardship A/V).
+ * 3. Default & Adverse Listings: Comprehensive breakdown of Section 6Q defaults, bankruptcy, and judgments.
+ * 4. What-If Score Simulator: Client-side model impact simulator for prospective credit actions (e.g. paying debts).
+ * 5. Section 20V Dispute Modal: Direct consumer dispute submission interface with statutory 30-day resolution tracking.
+ * 6. Bitemporal Enquiry Audit Log: Complete historical log of all subscriber hard and soft credit pulls.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Consumer Credit Report Route).
+ *   Next.js dynamic route component ('use client') handling entity identifier in URL path.
+ *   Interacts with `/api/reports/{id}`, `/api/disputes`, and scoring APIs.
+ *
+ * Legal / Regulatory:
+ *   Privacy Act 1988 Part IIIA (Cth) Section 20R (Consumer access rights), Section 20N (RHI 24-month limits),
+ *   Section 20V (Consumer dispute lodgement & adjudication), and Part IIIA Hardship neutrality rules.
+ */
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -30,6 +51,11 @@ import {
 } from '@carbon/icons-react';
 import Link from 'next/link';
 
+/**
+ * Consumer Credit Report component for individual credit file inspection and dispute initiation.
+ *
+ * @returns JSX.Element rendering score gauge, 24-month RHI table, simulator, and dispute modal.
+ */
 export default function CreditReportPage() {
   const params = useParams();
   const routeId = (params?.id as string) || "IND-8842-1994";

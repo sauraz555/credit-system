@@ -1,6 +1,17 @@
-"""
-CRMS Latency and Concurrency Benchmark Runner
-Executes batch concurrent requests against FastAPI backend endpoints to evaluate p50, p90, p95, and p99 latencies.
+"""CRMS Latency and Concurrency Benchmark Runner.
+
+Executes batch concurrent requests against FastAPI backend endpoints to evaluate
+p50, p90, p95, and p99 latencies for bitemporal report reconstruction and ledger
+ingestion pipelines.
+
+Architecture:
+    Performance Testing & Benchmarking Suite (Root Scripts).
+    Depends on FastAPI TestClient, application routers, and auth token generation.
+    Tests core query latency under simulated concurrent load.
+
+Legal / Regulatory:
+    Verifies that statutory report generation meets production SLA thresholds
+    without violating data access or audit logging latency limits.
 """
 
 import time
@@ -18,6 +29,7 @@ from app.auth import create_access_token
 
 client = TestClient(app)
 
+# REVIEW-SECURITY: Benchmarking tokens with administrative and provider claims generated locally for testing
 # Generate valid enterprise bearer tokens using seeded credentials
 admin_token = create_access_token({"sub": "admin-id", "email": "admin@bureau.gov.au", "role": "ADMIN"})
 provider_token = create_access_token({
@@ -28,6 +40,11 @@ provider_token = create_access_token({
 })
 
 def benchmark_report_lookup():
+    """Executes a single bitemporal report lookup request and measures roundtrip latency.
+
+    Returns:
+        tuple[int, float]: HTTP status code and elapsed time in milliseconds.
+    """
     start = time.perf_counter()
     res = client.get(
         "/api/reports/IND-8842-1994?as_of=2025-06-01",
@@ -37,6 +54,11 @@ def benchmark_report_lookup():
     return res.status_code, duration_ms
 
 def benchmark_ingest():
+    """Executes a single credit default ingestion request and measures roundtrip latency.
+
+    Returns:
+        tuple[int, float]: HTTP status code and elapsed time in milliseconds.
+    """
     start = time.perf_counter()
     res = client.post(
         "/api/ingest/record",
@@ -61,11 +83,17 @@ def benchmark_ingest():
     return res.status_code, duration_ms
 
 def run_benchmarks():
+    """Runs concurrent benchmarking workloads for report reconstruction and data ingestion.
+
+    Executes 100 concurrent requests across thread pools to compute empirical percentiles
+    (p50, p90, p95, p99) against target thresholds.
+    """
     print("=================================================================")
     print(" CRMS PERFORMANCE & RESILIENCE BENCHMARK (p95 LATENCY AUDIT)")
     print("=================================================================")
 
     # 1. Benchmark Report Lookups (100 requests, 10 workers)
+    # REVIEW-ASSUMPTION: 10 concurrent workers simulates typical bureau analyst concurrency
     print("\n[BENCHMARK 1] Executing 100 concurrent Report Lookups (Bitemporal Reconstruction)...")
     lookup_latencies = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:

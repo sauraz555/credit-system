@@ -1,3 +1,20 @@
+/**
+ * Authentication and Multi-Factor Verification (MFA) Portal.
+ *
+ * Provides enterprise identity challenge screens supporting password-based authentication,
+ * Time-based One-Time Password (TOTP) two-factor step-up verification, quick testing persona
+ * pre-fill buttons for development environments, and role-based redirect dispatching.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Authentication Route).
+ *   Next.js client-side component wrapped in React.Suspense for searchParams parsing.
+ *   Interacts with backend auth endpoints (`/api/auth/login`, `/api/auth/mfa/verify`).
+ *
+ * Legal / Regulatory:
+ *   APRA CPS 234 / NIST SP 800-63B: Mandates Multi-Factor Authentication (AAL2) for
+ *   all privileged institutional personas (Admin, Analyst, Credit Provider).
+ */
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -15,6 +32,11 @@ import { Login, Locked, UserAvatar, ArrowRight, Reset, Information, Security } f
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+/**
+ * Inner login form component managing interactive credential inputs, TOTP challenges, and session cookies.
+ *
+ * @returns JSX.Element rendering login inputs, MFA challenge modal, or quick testing persona tiles.
+ */
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -321,6 +343,11 @@ function LoginForm() {
   );
 }
 
+/**
+ * Exported Login page wrapped in React Suspense boundary for client-side search parameter parsing.
+ *
+ * @returns JSX.Element rendering the suspended LoginForm component.
+ */
 export default function LoginPage() {
   return (
     <React.Suspense fallback={<Loading description="Loading identity portal..." />}>

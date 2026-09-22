@@ -1,3 +1,25 @@
+"""Edge cases, hardship neutrality, and director risk graph test suite.
+
+Validates critical edge scenarios across the credit scoring pipeline:
+1. Hardship neutrality (Privacy Act Part IIIA Section 20V/CR Code: 'A' and 'V' codes
+   must never depress credit scores or trigger adverse penalty calculations).
+2. Complex director structural risk graphs (recursive company-director failure networks,
+   depth limits, and cycles).
+3. PAYDEX commercial scoring bounds (0-100 scale, early prompt payment bonuses).
+4. Statutory dispute lodgement and 30-day countdown timers.
+5. Ingest licensing validations (ADI vs Non-ADI permissible data types).
+
+Architecture:
+    Integration & Edge Case Test Suite (Backend Tests).
+    Validates scoring services, feature extractors, dispute workflows, and ingestion.
+    Executed during regression test cycles.
+
+Legal / Regulatory:
+    National Consumer Credit Protection Act 2009, Privacy Act 1988 Part IIIA
+    (Financial hardship information provisions, Section 20V dispute adjudication,
+    and Credit Reporting Code 2014).
+"""
+
 import os
 import sys
 import uuid
@@ -28,6 +50,7 @@ from app.tasks import run_data_expiry_job
 client = TestClient(app)
 
 def get_auth_headers(role: str, email: str, tenant_id: str = None):
+    """Generates bearer authorization headers with role claims and optional tenant context."""
     payload = {"sub": email, "email": email, "role": role}
     if tenant_id:
         payload["tenant_id"] = tenant_id
@@ -36,6 +59,7 @@ def get_auth_headers(role: str, email: str, tenant_id: str = None):
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_m4_data():
+    """Seeds test providers and test users for milestone 4 edge case scenarios."""
     init_db()
     db = SessionLocal()
 

@@ -1,3 +1,19 @@
+"""Dispute lifecycle and automated data retention test suite.
+
+Validates the full consumer dispute resolution cycle from submission through adjudication,
+ensuring ledger status transitions between ACTIVE, DISPUTED, and RESOLVED. Also validates
+the scheduled data retention task (Section 20W) against statutory expiry limits.
+
+Architecture:
+    Integration Test Suite (Backend Tests).
+    Validates dispute endpoints (`app.routers.disputes`) and Celery tasks (`app.tasks`).
+    Executed during CI test runs.
+
+Legal / Regulatory:
+    Privacy Act 1988 Part IIIA: Section 20V (Dispute resolution procedures and record status
+    isolation) and Section 20W (Statutory retention: RHI 2 years, Defaults 5 years).
+"""
+
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database import SessionLocal
@@ -11,6 +27,7 @@ client = TestClient(app)
 import uuid
 
 def test_dispute_lifecycle():
+    """Tests full lifecycle of dispute lodgement and status propagation to ledger."""
     db = SessionLocal()
     token = create_access_token({"sub": "admin-milestone5", "email": "admin@bureau.gov.au", "role": RoleEnum.ADMIN})
     headers = {"Authorization": f"Bearer {token}"}
@@ -60,6 +77,7 @@ def test_dispute_lifecycle():
 
 
 def test_data_expiry_celery_job():
+    """Tests synchronous execution of data expiry job, verifying RHI and DEFAULT status updates."""
     db = SessionLocal()
     
     entity = Entity(type=EntityTypeEnum.INDIVIDUAL, identifier=f"EXPIRY_TEST_{uuid.uuid4().hex[:8]}", basic_info={})

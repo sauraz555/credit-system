@@ -1,9 +1,16 @@
-"""0001_baseline_schema
+"""Baseline Relational Schema Migration (Alembic Revision 0001_baseline).
 
-Revision ID: 0001_baseline
-Revises: 
-Create Date: 2026-09-22 07:00:00.000000
+This migration establishes the complete 12-table baseline relational schema for the Credit
+Reporting Mechanism Platform (CRMS). It creates core tables for users, credit providers,
+credit entities, directorship links, ingest audit logs, the bitemporal credit ledger,
+the feature store, model versions, calculated scores, credit enquiries, statutory disputes,
+and immutable system audit logs.
 
+Architecture Tier:
+    Database Infrastructure / Schema Governance Layer.
+
+Regulatory Context:
+    - Privacy Act 1988 (Cth) Part IIIA & Privacy (Credit Reporting) Code 2014.
 """
 from typing import Sequence, Union
 from alembic import op
@@ -16,6 +23,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    """Executes forward migration, creating all 12 core tables and associated indexes."""
     conn = op.get_bind()
     inspector = sa.inspect(conn)
     existing_tables = inspector.get_table_names()
@@ -181,6 +189,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Rolls back the baseline migration by dropping all 12 tables in reverse dependency order."""
     for table_name in [
         'audit_log', 'disputes', 'enquiries', 'scores', 'model_versions',
         'feature_store', 'credit_ledger', 'ingest_events', 'director_links',

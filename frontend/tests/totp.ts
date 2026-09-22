@@ -1,5 +1,27 @@
+/**
+ * Time-Based One-Time Password (TOTP) Generator & Test Credentials Loader.
+ *
+ * Implements RFC 6238 HMAC-SHA1 TOTP generation in pure Node.js crypto and parses
+ * dynamic seed credentials from TEST_ACCOUNTS.md to support automated end-to-end
+ * multi-factor authentication testing in Playwright.
+ *
+ * Architecture:
+ *   Frontend Test Infrastructure (E2E Test Utilities).
+ *   Called by Playwright test specs (`e2e.spec.ts`, `axe.spec.ts`).
+ *   Reads dynamically generated TOTP secrets and generates 6-digit codes.
+ *
+ * Legal / Regulatory:
+ *   Supports NIST SP 800-63B Authenticator Assurance Level 2 (AAL2) testing.
+ */
+
 import crypto from 'crypto';
 
+/**
+ * Decodes a Base32 encoded string into a raw binary buffer.
+ *
+ * @param base32Str - Base32 string representation of the cryptographic secret.
+ * @returns Buffer containing decoded binary bytes.
+ */
 function base32ToBuffer(base32Str: string): Buffer {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = '';
@@ -17,6 +39,15 @@ function base32ToBuffer(base32Str: string): Buffer {
   return Buffer.from(bytes);
 }
 
+/**
+ * Computes the current 6-digit RFC 6238 TOTP token for a given Base32 secret.
+ *
+ * @param secret - Base32 encoded secret key.
+ * @param timeStep - Time step window in seconds (default 30s per RFC 6238).
+ * @returns 6-digit zero-padded OTP code string.
+ *
+ * // REVIEW-SECURITY: Used exclusively for automated test identity verification.
+ */
 export function generateTOTP(secret: string, timeStep: number = 30): string {
   const key = base32ToBuffer(secret);
   const epoch = Math.floor(Date.now() / 1000);
@@ -39,6 +70,15 @@ export function generateTOTP(secret: string, timeStep: number = 30): string {
 import fs from 'fs';
 import path from 'path';
 
+/**
+ * Loads test account credentials and Base32 TOTP secrets from root TEST_ACCOUNTS.md.
+ *
+ * Falls back to default development credentials if the dynamic file is missing or unparseable.
+ *
+ * @returns Map of role names to credentials objects including email, password, and totpSecret.
+ *
+ * // REVIEW-SECURITY: Reads local ephemeral credentials; never commit real secrets.
+ */
 export function getTestAccounts() {
   const accounts: Record<string, { email: string; password: string; totpSecret: string | null; role: string }> = {
     ADMIN: {

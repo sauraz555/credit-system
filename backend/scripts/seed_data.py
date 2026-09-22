@@ -1,3 +1,14 @@
+"""Synthetic Credit Bureau Population and Seeding Utility.
+
+This script populates development databases with realistic Australian credit subjects,
+including 500 consumer individuals (with simulated 24-month RHI strings and payment defaults),
+100 commercial companies (with trade payment invoices and director linkages), and corporate
+cross-directorship networks. It enforces an environment guardrail preventing execution outside development.
+
+Architecture Tier:
+    Database Seeding & Test Data (`backend/scripts/`).
+"""
+
 import os
 import sys
 import random
@@ -6,7 +17,7 @@ from faker import Faker
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Enforce environment guardrail
+# REVIEW-SECURITY: Enforce environment guardrail preventing accidental execution against production
 if os.getenv("ENVIRONMENT") != "development":
     raise RuntimeError(
         "CRMS Data Hygiene Guardrail Violation: Seed script execution rejected! "
@@ -21,12 +32,17 @@ from app.models import (
 
 fake = Faker('en_AU') # Australian locale
 
+
 def generate_rhi_code():
+    """Generates a random RHI character code conforming to Australian CR Code standards."""
     # 0 = OK, 1-6 = Late, X = Missed
     codes = ["0", "0", "0", "0", "0", "1", "2", "3", "4", "5", "6", "X"]
     return random.choice(codes)
 
+
 def seed():
+    """Seeds the database with 500 individuals, 100 companies, director links, and ledger records."""
+    # REVIEW-BUG: init_db() is called below without an import from app.database (raises NameError if run)
     init_db()
     db = SessionLocal()
     
@@ -143,6 +159,7 @@ def seed():
             
     db.commit()
     print("Seeding complete.")
+
 
 if __name__ == "__main__":
     seed()

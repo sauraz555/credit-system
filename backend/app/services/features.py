@@ -1,3 +1,27 @@
+"""Feature Engineering and Bitemporal Ledger Aggregation Service.
+
+This module extracts quantitative risk signals from the immutable credit ledger
+for both consumer individuals and commercial companies. It supports point-in-time
+bitemporal reconstruction (`as_of` date queries), implements statutory Financial
+Hardship Neutrality under the Privacy Act 1988 Part IIIA, computes dollar-weighted
+commercial PAYDEX scores, and traverses director networks to quantify cross-corporate
+insolvency contagion risk.
+
+Architecture Tier:
+    Analytical & Feature Engineering Layer (`backend/app/services/`).
+
+Key Dependencies & Callers:
+    - Depends on SQLAlchemy models (`CreditLedger`, `DirectorLink`, `Enquiry`, `Entity`).
+    - Consumed by `backend/app/services/scoring.py` to drive model scoring equations,
+      `routers/reports.py` for credit reports, and `routers/admin.py` for backtesting.
+
+Regulatory & Compliance Context:
+    - Privacy Act 1988 (Cth) Part IIIA & National Consumer Credit Protection Act 2009:
+      Enforces statutory Hardship Neutrality (codes 'A' and 'V' must never degrade credit scores).
+    - Privacy (Credit Reporting) Code 2014:
+      Governs 24-month rolling Repayment History Information (RHI) evaluation.
+"""
+
 import math
 from typing import Optional
 from datetime import date, datetime, timedelta
@@ -5,7 +29,38 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models import CreditLedger, Enquiry, RecordTypeEnum, RecordStatusEnum, EntityTypeEnum, DirectorLink, Entity
 
+
 def calculate_individual_features(entity_id: str, db: Session, as_of: Optional[date] = None) -> dict:
+    """Extracts numerical credit risk features for an individual consumer.
+
+    Queries the bitemporal ledger for all active, paid, and resolved entries valid
+    on or before `as_of`. Computes time-decayed RHI payment performance, active/paid
+    defaults, public record flags, file maturity, and recent enquiry velocity.
+
+    Args:
+        entity_id: Target consumer entity UUID.
+        db: Scoped SQLAlchemy database session.
+        as_of: Optional point-in-time date for historical file reconstruction.
+
+    Returns:
+        Dictionary containing extracted consumer features:
+            - rhi_history_score (float 0.0-1.0): Time-weighted repayment performance.
+            - total_credit_limit (float): Aggregated approved limits.
+            - default_count (int): Total recorded defaults.
+            - active_default_count (int): Currently outstanding unpaid defaults.
+            - paid_default_count (int): Satisfied defaults.
+            - default_amount (float): Total monetary balance of defaults.
+            - sci_count (int): Serious Credit Infringement count.
+            - bankruptcy_count (int): Insolvency and debt agreement count.
+            - oldest_account_months (int): Credit history length in months.
+            - enquiries_last_90_days (int): Inquiries recorded in previous 90 days.
+            - hardship_flag (bool, optional): Present if hardship arrangement exists.
+
+    Example:
+        >>> feats = calculate_individual_features("IND-UUID-1234", db)
+        >>> feats["rhi_history_score"] >= 0.0
+        True
+    """
     today = as_of or date.today()
     features = {
         "rhi_history_score": 0.0,
@@ -18,11 +73,12 @@ def calculate_individual_features(entity_id: str, db: Session, as_of: Optional[d
         "enquiries_last_90_days": 0
     }
 
-    # Fetch ledger records
+    # Fetch ledger records valid as of requested point-in-time
     records_q = db.query(CreditLedger).filter(
         CreditLedger.entity_id == entity_id,
         CreditLedger.status.in_([RecordStatusEnum.ACTIVE, RecordStatusEnum.PAID, RecordStatusEnum.RESOLVED])
     )
+    # REVIEW-ASSUMPTION: Bitemporal filter ensures assertions recorded after as_of are excluded from historical view
     if as_of:
         as_of_dt = datetime.combine(as_of, datetime.max.time())
         records_q = records_q.filter(
@@ -40,21 +96,26 @@ def calculate_individual_features(entity_id: str, db: Session, as_of: Optional[d
             oldest_date = rec.valid_from
 
         if rec.record_type == RecordTypeEnum.RHI:
-            # RHI strings are up to 24 chars: '0', '1'-'6', 'X'
+            # RHI strings are up to 24 chars representing monthly payment cycles: '0', '1'-'6', 'X', 'A', 'V'
             rhi_str = rec.data.get("rhi_history", "")
             for i, char in enumerate(rhi_str):
-                # Weight recent months higher
+                # REVIEW-ASSUMPTION: Linear decay weighting assigns highest importance to recent months.
+                # Month 0 has weight 1.0; month 23 drops to 0.54.
                 weight = 1.0 - (i * 0.02) # Max 24 months, so weight drops to ~0.52
                 rhi_max += weight
                 if char == '0':
+                    # Paid on time: award full weight
                     rhi_points += weight
                 elif char in '123456':
-                    rhi_points += (weight * (1.0 - int(char)/10.0)) # partial points
+                    # Partial points penalizing progressively worse late payment cycles
+                    rhi_points += (weight * (1.0 - int(char)/10.0))
                 elif char in ['V', 'A']:
-                    # Hardship arrangements: under CCR, treated neutral (does not reduce score like late payments)
+                    # REVIEW-LEGAL: Statutory Hardship Neutrality under Privacy Act 1988 Part IIIA:
+                    # Variation ('V') and Temporary Arrangement ('A') hardship indicators must NOT
+                    # degrade the credit score like delinquent payments. Awarding full weight ensures neutrality.
                     rhi_points += weight
                 elif char == 'X':
-                    pass # 0 points
+                    pass # 0 points (no data reported for this payment cycle)
 
         elif rec.record_type == RecordTypeEnum.DEFAULT:
             if rec.status == RecordStatusEnum.ACTIVE:
@@ -66,7 +127,7 @@ def calculate_individual_features(entity_id: str, db: Session, as_of: Optional[d
                 features["default_amount"] += float(rec.amount)
 
         elif rec.record_type == RecordTypeEnum.HARDSHIP:
-            # Statutory Hardship Neutrality (Privacy Act Part IIIA): flagged but does not penalize score
+            # Statutory Hardship Neutrality: Record flagged for reporting but does not alter numerical scoring penalties
             features["hardship_flag"] = True
 
         elif rec.record_type == RecordTypeEnum.SCI:
@@ -75,13 +136,15 @@ def calculate_individual_features(entity_id: str, db: Session, as_of: Optional[d
         elif rec.record_type == RecordTypeEnum.BANKRUPTCY:
             features["bankruptcy_count"] += 1
 
+    # Normalize RHI score to a 0.0 - 1.0 ratio
     if rhi_max > 0:
         features["rhi_history_score"] = rhi_points / rhi_max
 
+    # Compute account maturity in approximate 30-day months
     months_old = (today - oldest_date).days // 30
     features["oldest_account_months"] = months_old
 
-    # Enquiries
+    # Credit enquiry velocity over previous 90 days
     ninety_days_ago = today - timedelta(days=90)
     enquiries_q = db.query(Enquiry).filter(
         Enquiry.entity_id == entity_id,
@@ -93,19 +156,35 @@ def calculate_individual_features(entity_id: str, db: Session, as_of: Optional[d
 
     return features
 
+
 def _calculate_director_structural_risk(entity_id: str, db: Session, depth: int = 0) -> int:
+    """Traverses corporate directorship links to calculate cross-entity contagion risk.
+
+    Identifies if active directors of the target company have personal insolvencies,
+    defaults, or directorships in other distressed commercial entities.
+
+    Args:
+        entity_id: Company entity UUID.
+        db: Scoped database session.
+        depth: Current recursion depth (bounded at depth 1).
+
+    Returns:
+        Integer risk points aggregating adverse director signals.
+    """
+    # REVIEW-ASSUMPTION: Recursion bounded at depth=1 to prevent performance bottlenecks or infinite graph cycles
     if depth > 1:
         return 0
 
     risk_score = 0
-    # Find directors
+
+    # Find active directors of this company
     links = db.query(DirectorLink).filter(
         DirectorLink.company_entity_id == entity_id,
         DirectorLink.end_date.is_(None)
     ).all()
 
     for link in links:
-        # Check individual's personal bankruptcies/defaults
+        # Check individual director's personal bankruptcies and active defaults
         bad_events = db.query(CreditLedger).filter(
             CreditLedger.entity_id == link.individual_entity_id,
             CreditLedger.record_type.in_([RecordTypeEnum.BANKRUPTCY, RecordTypeEnum.DEFAULT]),
@@ -115,7 +194,7 @@ def _calculate_director_structural_risk(entity_id: str, db: Session, depth: int 
         if bad_events > 0:
             risk_score += bad_events
 
-        # Check other companies they direct
+        # Check other commercial entities directed by the same individual
         other_companies = db.query(DirectorLink).filter(
             DirectorLink.individual_entity_id == link.individual_entity_id,
             DirectorLink.company_entity_id != entity_id,
@@ -128,10 +207,31 @@ def _calculate_director_structural_risk(entity_id: str, db: Session, depth: int 
 
     return risk_score
 
+
 def calculate_company_features(entity_id: str, db: Session, as_of: Optional[date] = None) -> dict:
+    """Extracts commercial credit risk features for an incorporated company.
+
+    Calculates trade credit payment timeliness (PAYDEX score), public court record
+    frequencies (writs, judgments, insolvencies), enquiry frequency, and director
+    network structural risk.
+
+    Args:
+        entity_id: Target company entity UUID.
+        db: Scoped database session.
+        as_of: Optional historical point-in-time reconstruction date.
+
+    Returns:
+        Dictionary containing commercial risk features:
+            - paydex_score (int 1-100): Dollar-weighted payment timeliness index.
+            - total_exposure (float): Aggregated commercial liabilities.
+            - public_record_count (int): Count of court writs, defaults, and insolvencies.
+            - oldest_account_months (int): Age of oldest trade credit account.
+            - enquiries_last_90_days (int): Inquiries lodged in the last 90 days.
+            - structural_risk_points (int): Director contagion risk points.
+    """
     today = as_of or date.today()
     features = {
-        "paydex_score": 100, # 1-100 index
+        "paydex_score": 100, # 1-100 index (100 = prompt, on-time trade payments)
         "total_exposure": 0.0,
         "public_record_count": 0,
         "oldest_account_months": 0,
@@ -160,6 +260,7 @@ def calculate_company_features(entity_id: str, db: Session, as_of: Optional[date
             oldest_date = rec.valid_from
 
         if rec.record_type == RecordTypeEnum.TRADE_PAYMENT:
+            # Dollar-weighted Days Beyond Terms (DBT) aggregation
             amt = float(rec.amount) if rec.amount else 0.0
             dbt = rec.data.get("days_beyond_terms", 0)
             
@@ -169,7 +270,8 @@ def calculate_company_features(entity_id: str, db: Session, as_of: Optional[date
         elif rec.record_type in [RecordTypeEnum.DEFAULT, RecordTypeEnum.WRIT, RecordTypeEnum.BANKRUPTCY]:
             features["public_record_count"] += 1
 
-    # Calculate PAYDEX (1-100)
+    # Calculate commercial PAYDEX score (1-100 index):
+    # Paydex = 100 - average Days Beyond Terms (DBT), bounded between 1 and 100
     if total_invoice_value > 0:
         avg_dbt = weighted_dbt_sum / total_invoice_value
         paydex = max(1, 100 - min(100, int(avg_dbt)))
@@ -178,7 +280,7 @@ def calculate_company_features(entity_id: str, db: Session, as_of: Optional[date
     months_old = (today - oldest_date).days // 30
     features["oldest_account_months"] = months_old
 
-    # Enquiries
+    # Commercial credit enquiry volume over previous 90 days
     ninety_days_ago = today - timedelta(days=90)
     enquiries_q = db.query(Enquiry).filter(
         Enquiry.entity_id == entity_id,
@@ -188,12 +290,27 @@ def calculate_company_features(entity_id: str, db: Session, as_of: Optional[date
         enquiries_q = enquiries_q.filter(Enquiry.created_at <= as_of_dt)
     features["enquiries_last_90_days"] = enquiries_q.count()
 
-    # Structural risk
+    # Structural contagion risk across linked company directorships
     features["structural_risk_points"] = _calculate_director_structural_risk(entity_id, db)
 
     return features
 
+
 def update_feature_store(entity_id: str, db: Session, as_of: Optional[date] = None):
+    """Refreshes and persists the cached FeatureStore for an entity.
+
+    Calculates features based on entity type (INDIVIDUAL vs COMPANY). If `as_of`
+    is supplied, returns a transient HistoricalFeatureStore without modifying
+    the persistent live store.
+
+    Args:
+        entity_id: Target entity UUID.
+        db: Scoped SQLAlchemy database session.
+        as_of: Optional historical point-in-time date.
+
+    Returns:
+        FeatureStore model instance, transient historical container, or None if entity not found.
+    """
     from app.models import FeatureStore
     entity = db.query(Entity).filter(Entity.id == entity_id).first()
     if not entity:

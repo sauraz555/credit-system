@@ -1,3 +1,21 @@
+/**
+ * Credit Bureau Intelligence Platform Landing Page Dashboard.
+ *
+ * Serves as the primary operational entry point for the Credit Reporting Mechanism (CRMS),
+ * displaying platform health telemetry, high-level portfolio metrics, live bitemporal
+ * audit ledger event streams, and direct file lookup capabilities across individual and
+ * commercial corporate registers.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Root Dashboard Route).
+ *   Next.js client-side component ('use client') utilizing Carbon Design System components.
+ *   Queries backend stats (`/api/entities/stats`) and autocomplete (`/api/entities?search=`).
+ *
+ * Legal / Regulatory:
+ *   Privacy Act 1988 Part IIIA (Cth), Privacy (Credit Reporting) Code 2014, and National
+ *   Consumer Credit Protection Act 2009 (NCCPA).
+ */
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -25,11 +43,17 @@ import {
   Warning
 } from '@carbon/icons-react';
 
+/**
+ * Root Landing Dashboard component providing system metrics, search, and navigation.
+ *
+ * @returns JSX.Element rendering system status, search bar, metrics tiles, and module cards.
+ */
 export default function Home() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  // REVIEW-ASSUMPTION: Default mock statistics fallback in case backend telemetry endpoint is unreachable
   const [stats, setStats] = useState({
     individuals_count: 508,
     companies_count: 100,

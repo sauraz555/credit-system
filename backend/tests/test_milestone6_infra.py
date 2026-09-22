@@ -1,3 +1,19 @@
+"""Infrastructure, health checks, metrics, and SLA alerts test suite.
+
+Validates operational infrastructure capabilities including database/redis health probe
+endpoints (`/health`), Prometheus telemetry scraping (`/metrics`), and Celery periodic
+tasks tracking statutory 30-day dispute SLA thresholds.
+
+Architecture:
+    Infrastructure & Observability Test Suite (Backend Integration Tests).
+    Validates `app.main` system routes and `app.tasks.check_dispute_sla_alerts`.
+    Executed during continuous integration test runs.
+
+Legal / Regulatory:
+    Privacy Act 1988 Part IIIA Section 20V (Mandatory 30-day investigation timeframes
+    for consumer credit disputes, triggering proactive escalations).
+"""
+
 import os
 import sys
 import pytest
@@ -15,6 +31,7 @@ from app.tasks import check_dispute_sla_alerts
 client = TestClient(app)
 
 class TestMilestone6Infrastructure:
+    """Verifies infrastructure endpoints, health checks, and SLA monitoring background jobs."""
 
     def test_health_check_endpoint_checks_db_and_redis(self):
         """Milestone 6.4: /health endpoint verifies DB and Redis connectivity."""

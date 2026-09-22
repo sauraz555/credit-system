@@ -1,3 +1,20 @@
+"""Business correctness and regulatory logic test suite.
+
+Validates core scoring mathematical invariants, model weight normalization (sum=100),
+bitemporal ledger queries, Section 20W statutory retention schedules, automated enquiry
+audit generation upon report access, and director structural risk graph propagation.
+
+Architecture:
+    Correctness Test Suite (Backend Integration Tests).
+    Validates scoring engine, bitemporal report service, celery expiry tasks, and admin routes.
+    Executed during continuous integration test passes.
+
+Legal / Regulatory:
+    Privacy Act 1988 Part IIIA: Section 20W (Statutory data retention schedules),
+    Section 20R (Consumer enquiry logging), Section 6Q (Statutory default criteria),
+    and Part IIIA Hardship neutrality provisions.
+"""
+
 import os
 import sys
 import pytest
@@ -21,6 +38,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_test_data():
+    """Provisions administrative user context for correctness test fixtures."""
     init_db()
     db = SessionLocal()
     
@@ -38,10 +56,12 @@ def setup_test_data():
     db.close()
 
 def get_admin_headers():
+    """Generates bearer authorization headers with administrative credentials."""
     token = create_access_token({"sub": "admin@bureau.gov.au", "email": "admin@bureau.gov.au", "role": "ADMIN"})
     return {"Authorization": f"Bearer {token}"}
 
 class TestMilestone2Correctness:
+    """Verifies algorithmic correctness, bitemporal queries, and statutory data retention."""
 
     def test_model_weights_validator_rejects_non_100(self):
         """1. Backend validator: weights must total exactly 100, else 422."""

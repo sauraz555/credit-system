@@ -1,3 +1,22 @@
+/**
+ * Bureau Analyst Investigation & Model Back-Testing Workspace.
+ *
+ * Dedicated workspace for credit bureau analysts featuring:
+ * 1. Statutory Dispute Management: Reviewing lodged disputes, escalating SLA breaches, and recording adjudications.
+ * 2. Bitemporal Credit File Reconstruction: Investigating historical consumer credit files at arbitrary 'as_of' points in time.
+ * 3. Statistical Model Back-Testing: Uploading synthetic or empirical loan outcome datasets to calculate AUC-ROC, Gini, and KS metrics.
+ * 4. Audit Trail Exploration: Examining immutable tamper-evident provider enquiry logs.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Analyst Workspace Route).
+ *   Next.js client-side component ('use client') utilizing Carbon DataTable and FileUploader.
+ *   Interacts with `/api/disputes`, `/api/reports/{id}?as_of=`, and `/api/admin/models/backtest`.
+ *
+ * Legal / Regulatory:
+ *   Privacy Act 1988 Part IIIA Section 20V (Investigation of inaccurate consumer credit information)
+ *   and Section 20U (Strict obligations regarding correction of consumer credit reports).
+ */
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -41,6 +60,11 @@ import {
   Analytics
 } from '@carbon/icons-react';
 
+/**
+ * Bureau Analyst Workspace component for dispute investigations, bitemporal lookups, and model backtesting.
+ *
+ * @returns JSX.Element rendering dispute queues, bitemporal investigator, and backtesting uploaders.
+ */
 export default function AnalystWorkspace() {
   // Navigation / Tab state
   const [selectedTab, setSelectedTab] = useState(0);

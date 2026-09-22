@@ -1,3 +1,14 @@
+/**
+ * Playwright Test Automation Configuration.
+ *
+ * Configures timeouts, single-worker execution order, test reporters, and Chromium
+ * device parameters for the CRMS frontend end-to-end and accessibility test suites.
+ *
+ * Architecture:
+ *   Frontend Test Infrastructure (Playwright Test Runner).
+ *   Used by `npm run test:e2e` and `npm run test:a11y`.
+ */
+
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({

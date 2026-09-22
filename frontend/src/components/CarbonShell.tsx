@@ -1,3 +1,20 @@
+/**
+ * IBM Carbon Design System Application Shell Component.
+ *
+ * Provides persistent enterprise navigation framing, Carbon Design System dark/light
+ * theme switching ('g100' and 'g10'), role-aware profile presentation, session sign-out,
+ * and responsive collapsible side navigation.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Core Layout Shell).
+ *   Wraps root application routes and views with Carbon UI Header, SideNav, and SkipToContent.
+ *   Interacts with client-side localStorage and document cookies for session display.
+ *
+ * Legal / Regulatory:
+ *   Implements WCAG 2.1 AA accessibility standards (Section 508 / EN 301 549) via Carbon
+ *   semantic landmarks, skip navigation, high-contrast tokens, and keyboard-traversable menus.
+ */
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -34,8 +51,23 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-export default function CarbonShell({ children }: { children: React.ReactNode }) {
+/**
+ * Props for the CarbonShell component.
+ */
+export interface CarbonShellProps {
+  /** Nested page component tree to render within the Carbon application frame. */
+  children: React.ReactNode;
+}
+
+/**
+ * Root enterprise Carbon Design System navigation shell.
+ *
+ * @param props - CarbonShellProps containing page children.
+ * @returns JSX.Element wrapping page content in IBM Carbon header, side-nav, and theme context.
+ */
+export default function CarbonShell({ children }: CarbonShellProps) {
   const pathname = usePathname();
+  // REVIEW-ASSUMPTION: Default enterprise theme is 'g100' (Gray 100 dark mode)
   const [currentTheme, setCurrentTheme] = useState<'g100' | 'g10'>('g100');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);

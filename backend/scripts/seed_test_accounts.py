@@ -1,9 +1,27 @@
+"""Test account and RBAC credential seeding script.
+
+This module provisions standard testing accounts spanning all four system roles
+(ADMIN, ANALYST, PROVIDER, SUBJECT) with configured passwords and cryptographically
+random Base32 TOTP MFA secrets for development and automated test suites.
+
+Architecture:
+    Infrastructure & Test Tooling (Backend Scripts).
+    Depends on database models, Argon2 password hashing, and AES/HMAC encryption.
+    Outputs dynamic credentials to TEST_ACCOUNTS.md.
+
+Legal / Regulatory:
+    Ensures role separation compliant with Privacy Act 1988 Part IIIA access controls,
+    establishing distinct test subjects and licensed provider tenants.
+"""
+
 import os
 import sys
 import pyotp
 
+# REVIEW-SECURITY: Ensure local application packages can be resolved
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# REVIEW-SECURITY: Data hygiene guardrail preventing accidental execution against production databases
 # Enforce environment guardrail
 if os.getenv("ENVIRONMENT") != "development":
     raise RuntimeError(
@@ -17,9 +35,20 @@ from app.auth import hash_password
 from app.encryption import encrypt_field, compute_blind_index
 
 def seed_accounts():
+    """Provisions RBAC test accounts across all system personas with MFA secrets.
+
+    Cleanses existing test accounts to avoid unique constraint violations, creates
+    associated individual entity 'IND-8842-1994' (Jonathan Vance) for subject testing,
+    hashes passwords via Argon2id, commits records, and writes markdown credentials
+    to TEST_ACCOUNTS.md.
+
+    Raises:
+        RuntimeError: If ENVIRONMENT is not explicitly 'development'.
+    """
     db = SessionLocal()
 
     # Ensure Jonathan Vance exists so subject account has valid entity
+    # REVIEW-ASSUMPTION: IND-8842-1994 serves as the standard deterministic test persona across test suites
     vance = db.query(Entity).filter(Entity.id == "IND-8842-1994").first()
     if not vance:
         vance = Entity(

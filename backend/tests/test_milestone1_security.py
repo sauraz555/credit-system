@@ -1,3 +1,21 @@
+"""Security and RBAC verification test suite.
+
+Validates core security architecture controls including unauthenticated rejection (401),
+cross-role RBAC enforcement (403), consumer self-service file isolation, sliding-window
+rate limiting (429), field-level encryption (AES-256-GCM + HMAC blind indexing), and
+strict statutory prohibition of Tax File Numbers (TFN).
+
+Architecture:
+    Security Test Suite (Backend Integration Tests).
+    Validates FastAPI routers, authentication middleware, rate limiting, and encryption.
+    Executed during CI/CD security audits.
+
+Legal / Regulatory:
+    Privacy Act 1988 Part IIIA, Section 20E (Strict prohibition against collecting or storing
+    Tax File Numbers), Section 20R (Consumer credit report access controls), and Australian
+    Privacy Principles (APP 11: Security of personal information).
+"""
+
 import os
 import sys
 import unittest
@@ -15,6 +33,7 @@ from app.encryption import encrypt_field, decrypt_field, compute_blind_index
 client = TestClient(app)
 
 class TestMilestone1Security(unittest.TestCase):
+    """Integration test suite evaluating API authentication, RBAC, and encryption guarantees."""
 
     @classmethod
     def setUpClass(cls):

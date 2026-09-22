@@ -1,3 +1,15 @@
+"""Synthetic Ground-Truth Default Outcomes Generator for Backtesting.
+
+This script samples up to 200 entities from the database, evaluates their credit scores
+as of a fixed observation date (`2024-06-01`), and simulates empirical loan performance
+and default outcomes (`defaulted = 1` or `0`) across a 12-month performance window (`2025-06-01`)
+using a calibrated probability-of-default curve: $PD = 1.0 - (score / 1000)^{1.8}$.
+The results are written to `backend/scripts/synthetic_outcomes.csv` for zero-upload model validation.
+
+Architecture Tier:
+    Model Validation & Quantitative Analysis Data (`backend/scripts/`).
+"""
+
 import os
 import sys
 import csv
@@ -11,7 +23,9 @@ from app.models import Entity, EntityTypeEnum
 from app.services.features import calculate_individual_features, calculate_company_features
 from app.services.scoring import evaluate_individual_score, evaluate_company_score
 
+
 def generate_synthetic_outcomes():
+    """Generates synthetic historical default outcome records calibrated against credit scores."""
     init_db()
     db = SessionLocal()
     
@@ -21,6 +35,7 @@ def generate_synthetic_outcomes():
     print(f"Found {len(entities)} entities. Generating outcomes...")
     
     rows = []
+    # REVIEW-ASSUMPTION: Fixed seed guarantees reproducible backtest metrics across environments
     random.seed(42)
     obs_date = date(2024, 6, 1)
     outcome_date = date(2025, 6, 1)
@@ -44,6 +59,7 @@ def generate_synthetic_outcomes():
             
         score = res["score"]
         # Probability of default decreases sharply as score increases
+        # REVIEW-ASSUMPTION: Non-linear PD curve mimics empirical credit card / personal loan performance
         pd = max(0.01, min(0.95, 1.0 - (score / 1000.0) ** 1.8))
         defaulted = 1 if random.random() < pd else 0
         
@@ -61,6 +77,7 @@ def generate_synthetic_outcomes():
         writer.writerows(rows)
         
     print(f"Wrote {len(rows)} outcomes to {out_file}")
+
 
 if __name__ == "__main__":
     generate_synthetic_outcomes()

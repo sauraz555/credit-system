@@ -1,9 +1,37 @@
+/**
+ * Automated WCAG 2.1 AA Accessibility Test Suite (Axe-Core & Playwright).
+ *
+ * Exercises automated accessibility scanning across all portal routes and RBAC personas:
+ * - Public routes: `/login`, `/403`
+ * - Admin routes: `/`, `/admin`
+ * - Analyst routes: `/analyst`
+ * - Provider routes: `/provider`
+ * - Subject consumer routes: `/subject/IND-8842-1994`, `/subject`
+ *
+ * Architecture:
+ *   Frontend Test Suite (End-to-End Accessibility Automation).
+ *   Executes AxeBuilder with tags: 'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'.
+ *   Asserts 0 violations on all scanned views.
+ *
+ * Legal / Regulatory:
+ *   Disability Discrimination Act 1992 (Cth) and Australian Government Digital Service Standard,
+ *   requiring Level AA compliance with W3C Web Content Accessibility Guidelines (WCAG 2.1).
+ */
+
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { generateTOTP, getTestAccounts } from './totp';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
+/**
+ * Helper function authenticating a Playwright browser context into a designated RBAC persona.
+ *
+ * Handles standard password entry and conditional RFC 6238 TOTP two-factor completion.
+ *
+ * @param page - Playwright Page instance.
+ * @param roleKey - Target RBAC persona ('ADMIN', 'ANALYST', 'PROVIDER', 'SUBJECT').
+ */
 async function loginAs(page: any, roleKey: 'ADMIN' | 'ANALYST' | 'PROVIDER' | 'SUBJECT') {
   const accounts = getTestAccounts();
   const user = accounts[roleKey];

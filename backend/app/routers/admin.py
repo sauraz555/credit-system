@@ -1,3 +1,26 @@
+"""Administrative, Model Governance, and Statistical Backtesting API Router.
+
+This router provides supervisory and quantitative risk governance capabilities for the
+bureau, including:
+- Credit scoring model versioning with strict 100% factor weight sum validation.
+- Real statistical backtesting on empirical outcomes datasets computing ROC AUC,
+  Gini coefficient, Kolmogorov-Smirnov (KS) statistic, and 10-decile calibration tables.
+- Immutable bureau audit trail inspection.
+- Interactive corporate director contagion network graph extraction.
+
+Architecture Tier:
+    API / Administrative & Governance Layer (`backend/app/routers/`).
+
+Key Dependencies & Callers:
+    - Depends on `app.services.features`, `app.services.scoring`, `app.encryption`, and RBAC guards.
+    - Consumed by the Next.js Supervisory Console (`/admin`) and Risk Analyst Workspace (`/analyst`).
+
+Regulatory & Compliance Context:
+    - Model Governance & Auditability Standards:
+      Enforces model reproducibility, explicit factor weights validation, and complete audit logging
+      for all model state transitions.
+"""
+
 import os
 import csv
 import io
@@ -15,7 +38,17 @@ from app.services.scoring import evaluate_individual_score, evaluate_company_sco
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
+
 class ModelCreate(BaseModel):
+    """Payload schema for creating and configuring credit scoring models.
+
+    Attributes:
+        name: Human-readable model identifier (e.g. 'Consumer-Score-v2.1').
+        type: Classification (INDIVIDUAL or COMPANY).
+        weights: Dictionary of factor weight percentages (must total exactly 100.0%).
+        band_thresholds: Score boundaries for qualitative risk categories.
+        active: Whether this model version should immediately become the production engine.
+    """
     name: str
     type: EntityTypeEnum
     weights: Dict[str, Any]
@@ -25,15 +58,28 @@ class ModelCreate(BaseModel):
     @field_validator("weights")
     @classmethod
     def validate_weights_total_100(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        """Validates that all model weights sum to exactly 100.0%.
+
+        Args:
+            v: Weights dictionary mapping factor names to numerical percentages.
+
+        Returns:
+            Validated weights dictionary.
+
+        Raises:
+            ValueError: If weights are empty, non-numeric, or do not equal 100.0%.
+        """
         if not v:
             raise ValueError("Weights dictionary cannot be empty")
         try:
             total = sum(float(w) for w in v.values())
         except (ValueError, TypeError):
             raise ValueError("All weight values must be numeric")
+        # REVIEW-ASSUMPTION: Tolerance of 0.001 accounts for floating-point rounding
         if abs(total - 100.0) > 0.001:
             raise ValueError(f"Model weights must total exactly 100%. Current total: {total}%")
         return v
+
 
 @router.post("/models")
 def create_model(
@@ -41,8 +87,21 @@ def create_model(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(RoleEnum.ADMIN))
 ):
+    """Provisions a new credit scoring model version.
+
+    Role Requirement:
+        ADMIN only.
+
+    Args:
+        model_in: ModelCreate payload with 100% factor weights.
+        db: Scoped database session.
+        current_user: Authenticated ADMIN user model.
+
+    Returns:
+        JSON response with the created model's UUID.
+    """
     if model_in.active:
-        # Deactivate current active model
+        # REVIEW-SECURITY: Ensure only one model per entity type is active at any given time
         db.query(ModelVersion).filter(
             ModelVersion.type == model_in.type,
             ModelVersion.active == True
@@ -59,13 +118,27 @@ def create_model(
     db.commit()
     return {"status": "success", "model_id": model.id}
 
+
 @router.get("/models")
 def get_models(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.ANALYST))
 ):
+    """Lists all registered credit scoring model versions.
+
+    Role Requirement:
+        ADMIN or ANALYST.
+
+    Args:
+        db: Scoped database session.
+        current_user: Authenticated user.
+
+    Returns:
+        List of ModelVersion database records ordered by creation date descending.
+    """
     models = db.query(ModelVersion).order_by(ModelVersion.created_at.desc()).all()
     return models
+
 
 @router.post("/backtest")
 async def run_backtest(
@@ -75,13 +148,32 @@ async def run_backtest(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.ANALYST))
 ):
-    """
-    Real backtesting endpoint:
-    1. Reads outcome CSV (entity_id, outcome_date, defaulted).
-    2. Reconstructs features as of observation_date from bitemporal ledger.
-    3. Evaluates credit scores using the target model.
-    4. Computes discrimination metrics (AUC, Gini, KS statistic).
-    5. Builds default rate by score band and 10-decile calibration table.
+    """Executes a real statistical backtesting discrimination evaluation on an outcome dataset.
+
+    Steps:
+    1. Loads the target ModelVersion configuration.
+    2. Parses empirical outcome CSV (`entity_id, outcome_date, defaulted`).
+    3. Reconstructs point-in-time features as of `observation_date` via bitemporal queries.
+    4. Evaluates credit scores using the candidate model.
+    5. Computes non-parametric ROC AUC, Gini index ($2 \times \text{AUC} - 1$), and KS statistic.
+    6. Generates empirical default rates across risk bands and a 10-decile calibration table.
+
+    Role Requirement:
+        ADMIN or ANALYST.
+
+    Args:
+        model_id: Target ModelVersion UUID.
+        observation_date: Date string (YYYY-MM-DD) for historical feature reconstruction.
+        file: Optional uploaded CSV file with ground truth default outcomes.
+        db: Scoped database session.
+        current_user: Authenticated user.
+
+    Returns:
+        Statistical backtesting report JSON including AUC, Gini, KS, and decile table.
+
+    Raises:
+        HTTPException(400): If CSV format is invalid or observation_date cannot be parsed.
+        HTTPException(404): If target model is not found.
     """
     # 1. Fetch Model
     model = db.query(ModelVersion).filter(ModelVersion.id == model_id).first()
@@ -90,7 +182,7 @@ async def run_backtest(
     if not model:
         raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found.")
 
-    # 2. Parse observation date
+    # 2. Parse observation date for point-in-time feature extraction
     if observation_date:
         try:
             obs_date = datetime.strptime(observation_date, "%Y-%m-%d").date()
@@ -99,13 +191,13 @@ async def run_backtest(
     else:
         obs_date = date.today()
 
-    # 3. Read outcomes CSV
+    # 3. Read outcomes CSV (supports uploaded file or pre-seeded synthetic dataset)
     raw_content = ""
     if file:
         content_bytes = await file.read()
         raw_content = content_bytes.decode("utf-8-sig", errors="replace")
     else:
-        # Fallback to backend/scripts/synthetic_outcomes.csv
+        # REVIEW-ASSUMPTION: Fallback to synthetic_outcomes.csv enables zero-upload automated testing
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         default_csv = os.path.join(base_dir, "scripts", "synthetic_outcomes.csv")
         if os.path.exists(default_csv):
@@ -135,7 +227,7 @@ async def run_backtest(
     if not rows:
         raise HTTPException(status_code=400, detail="Outcomes CSV is empty or missing valid entity_id rows.")
 
-    # 4. Score each entity as of observation_date
+    # 4. Score each entity as of observation_date using bitemporal historical features
     scored_records = []
     for item in rows:
         ent_id = item["entity_id"]
@@ -163,7 +255,7 @@ async def run_backtest(
     if not scored_records:
         raise HTTPException(status_code=400, detail="None of the entities in the CSV were found in the database.")
 
-    # 5. Discrimination Metrics (AUC, Gini, KS)
+    # 5. Discrimination Metrics (AUC, Gini, Kolmogorov-Smirnov)
     defaulters = [r["score"] for r in scored_records if r["defaulted"] == 1]
     non_defaulters = [r["score"] for r in scored_records if r["defaulted"] == 0]
     n_def = len(defaulters)
@@ -174,8 +266,8 @@ async def run_backtest(
         gini = 0.0
         ks_stat = 0.0
     else:
-        # Lower credit score indicates higher risk of default
-        # Concordant pair: defaulter has lower score than non-defaulter
+        # REVIEW-ASSUMPTION: In credit risk scoring, a LOWER score implies HIGHER default probability.
+        # Concordant pair: defaulter has lower score than non-defaulter.
         concordant = 0.0
         for s_def in defaulters:
             for s_non in non_defaulters:
@@ -186,7 +278,7 @@ async def run_backtest(
         auc = concordant / (n_def * n_non)
         gini = 2.0 * auc - 1.0
 
-        # Kolmogorov-Smirnov statistic
+        # Kolmogorov-Smirnov (KS) statistic: maximum divergence between defaulter and non-defaulter CDFs
         sorted_records = sorted(scored_records, key=lambda x: x["score"])
         cum_def = 0
         cum_non = 0
@@ -201,7 +293,7 @@ async def run_backtest(
                 max_diff = diff
         ks_stat = max_diff
 
-    # 6. Default rate by band
+    # 6. Default rate by qualitative risk band
     target_bands = ["Excellent", "Great", "Good", "Fair", "Poor"]
     band_counts = {b: 0 for b in target_bands}
     band_defaults = {b: 0 for b in target_bands}
@@ -231,7 +323,7 @@ async def run_backtest(
             "default_rate": round(rate, 4)
         })
 
-    # 7. Decile calibration table
+    # 7. 10-Decile calibration table for model monotonicity assessment
     sorted_all = sorted(scored_records, key=lambda x: x["score"])
     deciles = []
     n_tot = len(sorted_all)
@@ -274,13 +366,28 @@ async def run_backtest(
         "message": f"Backtest executed on {len(scored_records)} records with AUC {round(auc, 4)}."
     }
 
+
 @router.get("/audit")
 def get_audit_log(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(RoleEnum.ADMIN))
 ):
+    """Retrieves recent bureau immutable audit log entries.
+
+    Role Requirement:
+        ADMIN only.
+
+    Args:
+        db: Scoped database session.
+        current_user: Authenticated ADMIN user model.
+
+    Returns:
+        List of AuditLog records ordered by timestamp descending (limit 50).
+    """
+    # REVIEW-SECURITY: Audit logs provide accountability for all administrative and operational data mutations
     logs = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(50).all()
     return logs
+
 
 @router.get("/network")
 def get_director_network(
@@ -288,7 +395,22 @@ def get_director_network(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.ANALYST))
 ):
-    """Fetch corporate director contagion graph nodes and edges."""
+    """Fetches corporate directorship graph nodes and edges for contagion risk visualization.
+
+    Constructs a directed graph linking companies to their active individual directors,
+    including decrypted display names, credit scores, and risk badges.
+
+    Role Requirement:
+        ADMIN or ANALYST.
+
+    Args:
+        limit_companies: Maximum number of companies to include in the graph layout.
+        db: Scoped database session.
+        current_user: Authenticated user.
+
+    Returns:
+        Dictionary containing node list, edge list, and total count metadata.
+    """
     from app.models import Entity, DirectorLink, Score
     
     companies = db.query(Entity).filter(Entity.type == EntityTypeEnum.COMPANY).limit(limit_companies).all()
@@ -344,4 +466,3 @@ def get_director_network(
         "total_nodes": len(nodes),
         "total_edges": len(edges)
     }
-

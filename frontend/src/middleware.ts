@@ -1,6 +1,33 @@
+/**
+ * Next.js Edge Routing & Role-Based Access Control (RBAC) Middleware.
+ *
+ * Intercepts incoming web requests to enforce session authentication and role-based
+ * route segregation before page hydration. Unauthenticated requests are directed to
+ * the login portal with redirect context, while unauthorized cross-role navigations
+ * are routed to the 403 Forbidden page.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Edge Routing & Session Guard).
+ *   Executes on the Edge runtime before SSR page components are invoked.
+ *   Reads session cookies ('auth_token', 'auth_role') set during authentication.
+ *
+ * Legal / Regulatory:
+ *   Privacy Act 1988 Part IIIA Section 20R: Prevents unauthorized consumer data exposure
+ *   by strictly isolating Subject, Provider, Analyst, and Administrator portal routes.
+ */
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+/**
+ * Next.js Edge Middleware function inspecting session cookies and enforcing RBAC policies.
+ *
+ * @param request - The incoming NextRequest containing path information and session cookies.
+ * @returns NextResponse.next() if authorized, or NextResponse.redirect() for login or 403.
+ *
+ * // REVIEW-SECURITY: Edge middleware validates cookie presence and role matching; the backend API
+ * // performs full cryptographic JWT signature validation and expiration checks independently.
+ */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -15,6 +42,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // REVIEW-SECURITY: Cookies 'auth_token' and 'auth_role' read from incoming client headers
   const token = request.cookies.get('auth_token')?.value;
   const role = request.cookies.get('auth_role')?.value?.toUpperCase();
 

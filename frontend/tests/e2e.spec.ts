@@ -1,9 +1,36 @@
+/**
+ * End-to-End Enterprise Workflow Integration Test Suite (Playwright).
+ *
+ * Exercises multi-persona user journeys across the Credit Reporting Mechanism:
+ * 1. Role-based Authentication: Testing password and TOTP challenges across all four personas.
+ * 2. Provider Ingestion: Validating ledger event submissions from licensed provider accounts.
+ * 3. Consumer Credit File & Dispute Lodgement: Reviewing 24-month RHI and lodging statutory disputes.
+ * 4. Model Governance & Back-Testing: Validating weight tuning and statistical discrimination metrics.
+ * 5. Commercial File & PAYDEX Assessment: Inspecting corporate trade experiences and director networks.
+ *
+ * Architecture:
+ *   Frontend Test Suite (Playwright E2E Automation).
+ *   Drives automated browser sessions against local Next.js frontend and FastAPI backend.
+ *   Uses RFC 6238 TOTP helper for MFA step-up verification.
+ *
+ * Legal / Regulatory:
+ *   Validates operational conformity with Privacy Act 1988 Part IIIA statutory workflows.
+ */
+
 import { test, expect } from '@playwright/test';
 import { generateTOTP, getTestAccounts } from './totp';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 
+/**
+ * Automates persona authentication in Playwright browser session.
+ *
+ * @param page - Playwright Page object.
+ * @param roleKey - Target user persona key ('ADMIN', 'ANALYST', 'PROVIDER', 'SUBJECT').
+ *
+ * // REVIEW-SECURITY: Clears existing cookies between test role switches to ensure clean session states.
+ */
 async function login(page: any, roleKey: 'ADMIN' | 'ANALYST' | 'PROVIDER' | 'SUBJECT') {
   const accounts = getTestAccounts();
   const user = accounts[roleKey];

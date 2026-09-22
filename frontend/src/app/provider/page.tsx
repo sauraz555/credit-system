@@ -1,3 +1,22 @@
+/**
+ * Credit Provider Data Ingestion & Statutory Enquiry Console.
+ *
+ * Provides licensed credit providers (ADIs, ACL licensees, telcos, utilities) with:
+ * 1. Single Record Ingestion: Interactive JSON schema-validated ledger submission.
+ * 2. Batch File Uploads: Bulk CSV ingestion with pre-commit syntactic and regulatory checks.
+ * 3. Permitted Credit Enquiries: Conducting hard credit assessments (with automatic bitemporal enquiry logging)
+ *    or account review lookups under valid regulatory purposes.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Credit Provider Portal).
+ *   Next.js client-side component ('use client') utilizing Carbon Design System components.
+ *   Interacts with `/api/ingest/record`, `/api/ingest/csv`, and `/api/reports/{id}`.
+ *
+ * Legal / Regulatory:
+ *   Privacy Act 1988 Part IIIA: Section 6Q (Statutory default criteria: >= $150, >= 60 days overdue,
+ *   formal notice served), Section 20N (Permissible RHI reporters), and Section 20R (Enquiry logging).
+ */
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -27,6 +46,11 @@ import {
   Catalog
 } from '@carbon/icons-react';
 
+/**
+ * Credit Provider Console component for ledger event submissions and bureau enquiries.
+ *
+ * @returns JSX.Element rendering JSON payload editor, batch file uploader, and enquiry console.
+ */
 export default function ProviderDashboard() {
   // Ingestion State
   const [templateType, setTemplateType] = useState('DEFAULT');

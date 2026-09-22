@@ -1,3 +1,19 @@
+"""Analyst back-testing and statistical discrimination test suite.
+
+Validates statistical evaluation pipelines for credit scoring models, including
+Area Under Curve (AUC-ROC), Gini coefficient, Kolmogorov-Smirnov (KS) statistic,
+and decile calibration metrics computed across synthetic portfolio outcomes.
+
+Architecture:
+    Analyst & Statistical Validation Test Suite (Backend Integration Tests).
+    Validates `/api/admin/models/backtest` endpoint and scoring engine statistical rigor.
+    Invoked during model governance and validation test passes.
+
+Legal / Regulatory:
+    APRA Prudential Practice Guide CPG 223 / APRA CPS 220 risk management standards,
+    requiring empirical discrimination and calibration proofs for internal credit models.
+"""
+
 import os
 import sys
 import csv
@@ -19,6 +35,7 @@ client = TestClient(app)
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_m3_data():
+    """Provisions analyst accounts, baseline credit scoring model, and sample entities."""
     init_db()
     db = SessionLocal()
 

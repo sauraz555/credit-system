@@ -1,3 +1,28 @@
+"""Comprehensive Credit Reporting, Scoring Evaluation, and Bitemporal Query API Router.
+
+This router delivers core credit file disclosure and analytical reporting services.
+It supports:
+- Bitemporal point-in-time file reconstruction (`as_of` date query) across the immutable ledger.
+- Real-time score generation with transparent driving factors under Privacy Act Section 20R.
+- Mandatory statutory credit enquiry logging for participating credit providers (Section 20E/20M).
+- Strict consumer subject privacy isolation preventing unauthorized cross-file access.
+- Corporate directorship link traversal and contagion risk scoring.
+
+Architecture Tier:
+    API / Reporting & Scoring Layer (`backend/app/routers/`).
+
+Key Dependencies & Callers:
+    - Depends on `app.services.features`, `app.services.scoring`, `app.encryption`, and rate limiters.
+    - Consumed by consumer portals (`/subject/[id]`), credit provider assessment screens (`/provider`),
+      and supervisory consoles.
+
+Regulatory & Compliance Context:
+    - Privacy Act 1988 (Cth) Part IIIA & Privacy (Credit Reporting) Code 2014:
+      - Section 20E/20M: Credit provider file access strictly requires an audit log enquiry.
+      - Section 20R: Credit reporting bodies must provide human-readable factors driving score calculations.
+      - APP 11 & Part IIIA Division 2: Rigorous tenant isolation ensuring consumers only view their own file.
+"""
+
 import json
 from datetime import datetime, time, date
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -17,7 +42,16 @@ from app.encryption import decrypt_field, compute_blind_index
 
 router = APIRouter(prefix="/api", tags=["reports", "scoring"])
 
+
 def ensure_mock_user(db: Session) -> str:
+    """Ensures a fallback officer user exists in test environments.
+
+    Args:
+        db: Scoped database session.
+
+    Returns:
+        User ID string.
+    """
     user = db.query(User).filter(User.email == "officer@example.com").first()
     if not user:
         user = User(
@@ -33,13 +67,23 @@ def ensure_mock_user(db: Session) -> str:
             db.rollback()
     return user.id if user else "SYSTEM"
 
+
 def find_entity(entity_id: str, db: Session) -> Optional[Entity]:
+    """Finds an entity record using direct UUID, HMAC blind index, or clean identifier.
+
+    Args:
+        entity_id: Search query string (UUID, ABN/ACN, or license number).
+        db: Scoped database session.
+
+    Returns:
+        Entity SQLAlchemy model instance if found, None otherwise.
+    """
     # 1. Direct match on UUID id
     entity = db.query(Entity).filter(Entity.id == entity_id).first()
     if entity:
         return entity
         
-    # 2. Match via Blind Index on encrypted identifier
+    # REVIEW-SECURITY: 2. Match via HMAC-SHA256 Blind Index on encrypted identifier
     blind_idx = compute_blind_index(entity_id)
     entity = db.query(Entity).filter(Entity.identifier_blind_index == blind_idx).first()
     if entity:
@@ -50,7 +94,7 @@ def find_entity(entity_id: str, db: Session) -> Optional[Entity]:
     if entity:
         return entity
         
-    # 4. Cleaned identifier blind index (e.g. stripped prefixes)
+    # 4. Cleaned identifier blind index (e.g. stripped formatting prefixes)
     clean_id = entity_id.replace("-", "").replace("IND", "").replace("ACN", "").replace("ABN", "").strip()
     if clean_id:
         clean_blind_idx = compute_blind_index(clean_id)
@@ -60,7 +104,7 @@ def find_entity(entity_id: str, db: Session) -> Optional[Entity]:
             
     return None
 
-    # 3. Fallback: match by name in basic_info
+    # Fallback: match by name in basic_info
     entity = db.query(Entity).filter(
         or_(
             Entity.basic_info.cast(str).ilike(f"%{entity_id}%")
@@ -68,9 +112,14 @@ def find_entity(entity_id: str, db: Session) -> Optional[Entity]:
     ).first()
     return entity
 
+
 @router.get("/entities/stats")
 def get_entity_stats(db: Session = Depends(get_db)):
-    """Bureau aggregate metrics for executive dashboard."""
+    """Retrieves high-level bureau metrics for executive reporting dashboards.
+
+    Returns:
+        JSON dictionary with entity counts, ledger volumes, open dispute totals, and enquiry counts.
+    """
     individuals_count = db.query(Entity).filter(Entity.type == EntityTypeEnum.INDIVIDUAL).count()
     companies_count = db.query(Entity).filter(Entity.type == EntityTypeEnum.COMPANY).count()
     ledger_count = db.query(CreditLedger).count()
@@ -89,6 +138,7 @@ def get_entity_stats(db: Session = Depends(get_db)):
         "hash_consistency": "100.0%"
     }
 
+
 @router.get("/entities")
 def list_entities(
     type: Optional[str] = Query(None, description="INDIVIDUAL or COMPANY"),
@@ -97,7 +147,18 @@ def list_entities(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db)
 ):
-    """Search and paginate bureau entities."""
+    """Searches and paginates bureau entities with latest score summaries.
+
+    Args:
+        type: Optional filter by EntityTypeEnum (INDIVIDUAL or COMPANY).
+        search: Substring query for identifier or basic info.
+        limit: Number of records per page (1 to 100).
+        offset: Record pagination offset.
+        db: Scoped database session.
+
+    Returns:
+        Paginated list of entity summaries.
+    """
     query = db.query(Entity)
     if type:
         query = query.filter(Entity.type == type.upper())
@@ -135,17 +196,37 @@ def list_entities(
         "entities": results
     }
 
+
 @router.post("/scoring/evaluate/{entity_id}")
 def evaluate_score(
     entity_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Force recompute of features and score for an entity."""
+    """Triggers on-demand feature recalculation and score generation for an entity.
+
+    Enforces subject file isolation: SUBJECT callers cannot re-score foreign entities.
+
+    Role Requirement:
+        Any authenticated role (SUBJECT restricted to own file).
+
+    Args:
+        entity_id: Target entity UUID.
+        db: Scoped database session.
+        current_user: Authenticated user model.
+
+    Returns:
+        Generated Score record details.
+
+    Raises:
+        HTTPException(403): If a consumer attempts to score another individual.
+        HTTPException(404): If entity is not found.
+    """
     entity = find_entity(entity_id, db)
     if not entity:
         raise HTTPException(status_code=404, detail=f"Entity {entity_id} not found")
         
+    # REVIEW-SECURITY: Subject file tenant isolation check
     if current_user.role == RoleEnum.SUBJECT:
         if current_user.entity_id != entity.id and current_user.id != entity.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Cannot score another subject.")
@@ -162,6 +243,7 @@ def evaluate_score(
         "top_factors": score.top_factors
     }
 
+
 @router.get("/reports/{entity_id}")
 def get_report(
     entity_id: str,
@@ -170,14 +252,37 @@ def get_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Fetch full credit report, returning score, ledger, enquiries, and director links."""
+    """Retrieves a full credit report including score, ledger history, enquiries, and director ties.
+
+    Supports bitemporal historical point-in-time reconstruction via `as_of=YYYY-MM-DD`.
+    Mandatory compliance side-effect: Whenever a credit provider queries a report,
+    a statutory `Enquiry` record is automatically committed to the bureau audit trail.
+
+    Role Requirement:
+        SUBJECT (own file only), PROVIDER, ANALYST, or ADMIN.
+
+    Args:
+        entity_id: Target entity UUID or identifier.
+        request: FastAPI request object for rate limiting.
+        as_of: Optional point-in-time historical filter date.
+        db: Scoped database session.
+        current_user: Authenticated user model.
+
+    Returns:
+        Comprehensive credit file JSON dictionary.
+
+    Raises:
+        HTTPException(403): If a consumer attempts to inspect a foreign file.
+        HTTPException(404): If entity is not found.
+        HTTPException(500): If mandatory statutory enquiry logging fails for a provider.
+    """
     rate_limit_reports(request, current_user.id)
     
     entity = find_entity(entity_id, db)
     if not entity:
         raise HTTPException(status_code=404, detail=f"Entity '{entity_id}' not found")
         
-    # Subject privacy rule
+    # REVIEW-SECURITY: Subject privacy rule: consumers may strictly inspect only their own credit file
     if current_user.role == RoleEnum.SUBJECT:
         if current_user.entity_id != entity.id and current_user.id != entity.id:
             raise HTTPException(
@@ -195,7 +300,7 @@ def get_report(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid as_of date format. Use YYYY-MM-DD")
 
-    # Mandatory Enquiry Logging under Privacy Act 1988 Part IIIA:
+    # REVIEW-LEGAL: Mandatory Enquiry Logging under Privacy Act 1988 Part IIIA Section 20E/20M:
     # All live lookups AND all credit provider queries (including point-in-time as-of lookups) must log an enquiry.
     if not as_of or current_user.role == RoleEnum.PROVIDER:
         try:
@@ -208,13 +313,16 @@ def get_report(
             db.commit()
         except Exception as e:
             db.rollback()
+            # If enquiry logging fails for a credit provider, block access to prevent compliance breach
             if current_user.role == RoleEnum.PROVIDER:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Compliance Error: Provider access denied because mandatory statutory enquiry logging failed."
                 )
         
-    # Fetch ledger records according to bitemporal rules (valid_from <= as_of AND recorded_at <= as_of)
+    # Fetch ledger records according to bitemporal rules:
+    # 1. Effective time valid on or before as_of: valid_from <= as_of_date
+    # 2. System recording time asserted on or before as_of: recorded_at <= as_of_dt
     ledger_query = db.query(CreditLedger).filter(CreditLedger.entity_id == entity.id)
     if as_of_date:
         ledger_query = ledger_query.filter(
@@ -223,7 +331,7 @@ def get_report(
         )
     ledger = ledger_query.order_by(CreditLedger.valid_from.desc()).all()
 
-    # Fetch enquiries
+    # Fetch enquiries recorded up to as_of
     enquiries_query = db.query(Enquiry).filter(Enquiry.entity_id == entity.id)
     if as_of_dt:
         enquiries_query = enquiries_query.filter(Enquiry.created_at <= as_of_dt)
@@ -357,17 +465,35 @@ def get_report(
         ]
     }
 
+
 @router.get("/reports/{entity_id}/enquiries")
 def get_report_enquiries(
     entity_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Fetch logged enquiries for an entity with Subject isolation."""
+    """Retrieves all logged bureau enquiries for an entity with Subject file isolation.
+
+    Role Requirement:
+        SUBJECT (own file only), ADMIN, or ANALYST.
+
+    Args:
+        entity_id: Target entity UUID or identifier.
+        db: Scoped database session.
+        current_user: Authenticated user model.
+
+    Returns:
+        List of Enquiry audit records.
+
+    Raises:
+        HTTPException(403): If a consumer attempts to view enquiries on another subject's file.
+        HTTPException(404): If entity is not found.
+    """
     entity = find_entity(entity_id, db)
     if not entity:
         raise HTTPException(status_code=404, detail=f"Entity '{entity_id}' not found")
         
+    # REVIEW-SECURITY: Enforce Subject file tenant isolation on enquiry disclosure
     if current_user.role == RoleEnum.SUBJECT:
         if current_user.entity_id != entity.id and current_user.id != entity.id:
             raise HTTPException(

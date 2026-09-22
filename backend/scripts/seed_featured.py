@@ -1,3 +1,15 @@
+"""Featured Entity Seeding Script for Demonstrations and E2E Tests.
+
+This script populates high-fidelity benchmark consumer and corporate profiles:
+1. Jonathan Edward Vance (`IND-8842-1994`): Consumer with home loan (NAB), credit card (CBA),
+   auto lease (Macquarie), and a disputed Telstra default under Section 20V.
+2. Apex Industrial Holdings Pty Ltd (`ACN-109-283-912`): Commercial wholesale equipment company
+   with trade payment records (PAYDEX 78) and linked director Marcus Sterling.
+
+Architecture Tier:
+    Test Data & Demonstrations Layer (`backend/scripts/`).
+"""
+
 import os
 import sys
 from datetime import datetime, date, timedelta
@@ -10,7 +22,9 @@ from app.models import (
     RecordTypeEnum, RecordStatusEnum, Score, ModelVersion, Dispute
 )
 
+
 def seed_featured():
+    """Seeds rich, realistic featured entities and associated ledger records for live demo."""
     init_db()
     db = SessionLocal()
 
@@ -215,6 +229,7 @@ def seed_featured():
 
     print("Featured entities seeded successfully!")
     db.close()
+
 
 if __name__ == "__main__":
     seed_featured()

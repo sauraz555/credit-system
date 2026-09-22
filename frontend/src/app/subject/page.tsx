@@ -1,3 +1,22 @@
+/**
+ * Commercial Credit Intelligence & Corporate PAYDEX Assessment Portal.
+ *
+ * Provides commercial risk intelligence for Australian registered corporations (ACN/ABN):
+ * 1. Corporate Credit Scoring & PAYDEX: Evaluation of trade payment promptness on a 1-100 scale.
+ * 2. Director Network Contagion: Interactive structural graph mapping cross-directorship failures.
+ * 3. Trade Payment Experiences: Breakdown of supplier credit lines, payment terms, and past-due aging.
+ * 4. PPSR Security Interests: Registered charges, General Security Agreements, and collateral rankings.
+ *
+ * Architecture:
+ *   Frontend Presentation Layer (Commercial Credit Route).
+ *   Next.js client-side component ('use client') wrapped in React.Suspense for query param handling.
+ *   Interacts with `/api/entities?type=COMPANY` and `/api/reports/{id}`.
+ *
+ * Legal / Regulatory:
+ *   Corporations Act 2001 (Cth), Personal Property Securities Act 2009 (PPSA / PPSR),
+ *   and Privacy Act 1988 Part IIIA commercial credit provisions.
+ */
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -31,6 +50,11 @@ import {
   Renew
 } from '@carbon/icons-react';
 
+/**
+ * Inner commercial credit file investigation and PAYDEX visualization component.
+ *
+ * @returns JSX.Element rendering company identity, PAYDEX gauge, director network, and trade payment tables.
+ */
 function CommercialSubjectContent() {
   const searchParams = useSearchParams();
   const queryId = searchParams.get('id') || 'ACN-109-283-912';
@@ -692,6 +716,11 @@ function CommercialSubjectContent() {
   );
 }
 
+/**
+ * Exported Commercial Subject page wrapped in React Suspense boundary.
+ *
+ * @returns JSX.Element rendering suspended CommercialSubjectContent component.
+ */
 export default function CommercialSubjectPage() {
   return (
     <React.Suspense fallback={<InlineLoading description="Loading commercial credit registry..." />}>
