@@ -31,7 +31,7 @@ export default function AppShell({ children }: AppShellProps) {
   const [pickedEntity, setPickedEntity] = useState<{ id: string; name: string } | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const gitSha = process.env.NEXT_PUBLIC_GIT_SHA || '043389f';
+  const gitSha = process.env.NEXT_PUBLIC_GIT_SHA || 'v1.0-nepal';
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
