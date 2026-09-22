@@ -112,25 +112,23 @@ export default function AppShell({ children }: AppShellProps) {
   return (
     <div className="min-h-screen flex flex-col bg-[#0b0b0d] text-[#e6e6e6]">
       {/* Top Bar */}
-      <header className="sticky top-0 z-50 bg-[#0b0b0d] border-b border-[#202026] h-14 flex items-center px-6">
-        <div className="w-full max-w-[1280px] mx-auto flex items-center justify-between gap-6">
+      <header className="crm-header sticky top-0 z-50 bg-[#0b0b0d] border-b border-[#202026] h-14 flex items-center px-6">
+        <div className="crm-header-inner w-full max-w-[1280px] mx-auto flex items-center justify-between gap-6">
           {/* Left: Product Name (Plain branding string, no home link) */}
           <div className="shrink-0">
-            <span className="font-semibold text-sm tracking-tight text-[#e6e6e6]">
+            <span className="crm-brand font-semibold text-sm tracking-tight text-[#e6e6e6]">
               Credit Reporting Mechanism
             </span>
           </div>
 
           {/* Middle: Five nav links across the middle */}
-          <nav aria-label="Main Navigation" className="flex items-center gap-8 text-sm">
+          <nav aria-label="Main Navigation" className="crm-nav flex items-center gap-8 text-sm">
             {navItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className={`py-1 transition-colors ${
-                  item.isActive
-                    ? 'text-[#e6e6e6] font-medium border-b-2 border-[#0f62fe]'
-                    : 'text-[#999999] hover:text-[#e6e6e6]'
+                className={`crm-nav-link py-1 transition-colors ${
+                  item.isActive ? 'active' : ''
                 }`}
               >
                 {item.label}
@@ -146,7 +144,7 @@ export default function AppShell({ children }: AppShellProps) {
                   type="button"
                   aria-label={`User Menu (${userRole})`}
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="w-8 h-8 rounded-[2px] bg-[#1c1c21] border border-[#202026] text-xs font-semibold text-[#e6e6e6] flex items-center justify-center hover:border-[#3e3e48] transition-colors focus:outline-none"
+                  className="crm-user-menu-btn w-8 h-8 rounded-[2px] bg-[#1c1c21] border border-[#202026] text-xs font-semibold text-[#e6e6e6] flex items-center justify-center hover:border-[#3e3e48] transition-colors focus:outline-none"
                 >
                   {getInitials()}
                 </button>
@@ -176,7 +174,7 @@ export default function AppShell({ children }: AppShellProps) {
             ) : (
               <Link
                 href="/login"
-                className="text-xs font-medium text-[#e6e6e6] hover:text-white px-3 py-1.5 border border-[#202026] bg-[#141417] hover:bg-[#1c1c21] rounded-[2px] transition-colors"
+                className="crm-signin-btn text-xs font-medium text-[#e6e6e6] hover:text-white px-3 py-1.5 border border-[#202026] bg-[#141417] hover:bg-[#1c1c21] rounded-[2px] transition-colors"
               >
                 Sign in
               </Link>
@@ -186,12 +184,12 @@ export default function AppShell({ children }: AppShellProps) {
       </header>
 
       {/* Main Content Area: max-width 1280px, centred, generous margin */}
-      <main id="main-content" className="flex-1 w-full max-w-[1280px] mx-auto px-6 py-6">
+      <main id="main-content" className="crm-main-container flex-1 w-full max-w-[1280px] mx-auto px-6 py-6">
         {children}
       </main>
 
       {/* Footer: one line, small, muted — product name, git SHA, nothing else */}
-      <footer className="border-t border-[#202026] py-5 text-center text-xs text-[#999999]">
+      <footer className="crm-footer border-t border-[#202026] py-5 text-center text-xs text-[#999999]">
         Credit Reporting Mechanism &middot; <span className="font-mono text-[11px]">{gitSha}</span>
       </footer>
     </div>
