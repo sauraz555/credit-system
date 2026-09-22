@@ -341,7 +341,7 @@ export default function ProviderDashboard() {
 
                     <div className="flex items-center justify-between mt-4">
                       <div className="text-xs text-[var(--cds-text-secondary)] font-mono">
-                        Validation Schema: <strong className="text-white">APRA-CCR-v2.4.json</strong>
+                        Validation Schema: <strong className="text-white">OAIC-CR-CODE-v2.4.json</strong>
                       </div>
 
                       <Button

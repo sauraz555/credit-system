@@ -2,7 +2,7 @@ import json
 from datetime import datetime, time, date
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, String, cast
 from typing import Optional, List, Dict, Any
 from app.database import get_db
 from app.models import (
@@ -18,11 +18,11 @@ from app.encryption import decrypt_field, compute_blind_index
 router = APIRouter(prefix="/api", tags=["reports", "scoring"])
 
 def ensure_mock_user(db: Session) -> str:
-    user = db.query(User).filter(User.email == "officer@apra-crms.gov.au").first()
+    user = db.query(User).filter(User.email == "officer@example.com").first()
     if not user:
         user = User(
             id="MOCK_USER_ID",
-            email="officer@apra-crms.gov.au",
+            email="officer@example.com",
             password_hash="system_managed_hash",
             role=RoleEnum.ANALYST
         )
@@ -107,7 +107,7 @@ def list_entities(
             or_(
                 Entity.identifier.ilike(f"%{s}%"),
                 Entity.id.ilike(f"%{s}%"),
-                Entity.basic_info.cast(str).ilike(f"%{s}%")
+                cast(Entity.basic_info, String).ilike(f"%{s}%")
             )
         )
     
@@ -195,18 +195,24 @@ def get_report(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid as_of date format. Use YYYY-MM-DD")
 
-    # Log enquiry attributed to caller (only for live non-as-of queries)
-    if not as_of:
+    # Mandatory Enquiry Logging under Privacy Act 1988 Part IIIA:
+    # All live lookups AND all credit provider queries (including point-in-time as-of lookups) must log an enquiry.
+    if not as_of or current_user.role == RoleEnum.PROVIDER:
         try:
             enquiry = Enquiry(
                 entity_id=entity.id,
                 user_id=current_user.id,
-                reason="Comprehensive Bureau Credit Assessment (Part IIIA)"
+                reason="Comprehensive Bureau Credit Assessment (Privacy Act 1988 Part IIIA)"
             )
             db.add(enquiry)
             db.commit()
-        except Exception:
+        except Exception as e:
             db.rollback()
+            if current_user.role == RoleEnum.PROVIDER:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Compliance Error: Provider access denied because mandatory statutory enquiry logging failed."
+                )
         
     # Fetch ledger records according to bitemporal rules (valid_from <= as_of AND recorded_at <= as_of)
     ledger_query = db.query(CreditLedger).filter(CreditLedger.entity_id == entity.id)
@@ -350,3 +356,33 @@ def get_report(
             for rec in ledger
         ]
     }
+
+@router.get("/reports/{entity_id}/enquiries")
+def get_report_enquiries(
+    entity_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Fetch logged enquiries for an entity with Subject isolation."""
+    entity = find_entity(entity_id, db)
+    if not entity:
+        raise HTTPException(status_code=404, detail=f"Entity '{entity_id}' not found")
+        
+    if current_user.role == RoleEnum.SUBJECT:
+        if current_user.entity_id != entity.id and current_user.id != entity.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Subjects may only inspect enquiries on their own credit file."
+            )
+            
+    enquiries = db.query(Enquiry).filter(Enquiry.entity_id == entity.id).order_by(Enquiry.created_at.desc()).all()
+    return [
+        {
+            "id": enq.id,
+            "entity_id": enq.entity_id,
+            "user_id": enq.user_id,
+            "reason": enq.reason,
+            "created_at": str(enq.created_at)
+        }
+        for enq in enquiries
+    ]

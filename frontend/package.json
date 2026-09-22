@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:a11y": "playwright test tests/axe.spec.ts",
+    "test:e2e": "playwright test tests/e2e.spec.ts",
+    "test": "playwright test"
   },
   "dependencies": {
     "@carbon/icons-react": "^11.88.0",
@@ -17,6 +20,8 @@
     "sass": "^1.104.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

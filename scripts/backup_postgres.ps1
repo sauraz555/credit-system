@@ -2,7 +2,7 @@
 .SYNOPSIS
     Automated Daily PostgreSQL Backup Script for CRMS.
 .DESCRIPTION
-    Creates a timestamped, compressed backup of the PostgreSQL database per APRA APS 220 requirements.
+    Creates a timestamped, compressed backup of the PostgreSQL database per Privacy Act 1988 Part IIIA and Privacy (Credit Reporting) Code requirements.
 #>
 
 param (

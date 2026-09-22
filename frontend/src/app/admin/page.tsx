@@ -159,7 +159,7 @@ export default function AdminAnalystDashboard() {
         </Breadcrumb>
 
         <div className="flex items-center gap-3 text-xs">
-          <Tag type="magenta" size="sm" className="font-mono m-0">APRA L3 GOVERNANCE</Tag>
+          <Tag type="magenta" size="sm" className="font-mono m-0">PART IIIA GOVERNANCE</Tag>
           <Tag type="blue" size="sm" className="font-mono m-0">ALGORITHM AUDIT PASS</Tag>
         </div>
       </div>
@@ -198,7 +198,7 @@ export default function AdminAnalystDashboard() {
           <InlineNotification
             kind="success"
             title="Scoring Algorithm Model Version Deployed"
-            subtitle="Challenger model weights successfully calibrated and validated against historical APRA APS 220 portfolios. Merkle root hash committed to immutable audit ledger."
+            subtitle="Challenger model weights successfully calibrated and validated against historical credit portfolios under Privacy Act 1988 Part IIIA. Merkle root hash committed to immutable audit ledger."
             onCloseButtonClick={() => setDeploySuccess(false)}
             lowContrast
           />
@@ -266,7 +266,7 @@ export default function AdminAnalystDashboard() {
                     <div>
                       <div className="flex justify-between mb-1.5">
                         <label htmlFor="slider-util" className="text-white font-medium">Credit Facility Utilisation Weight:</label>
-                        <span className="font-mono text-[#4589ff] font-bold">{weightUtil}%</span>
+                        <span className="font-mono text-[#78a9ff] font-bold">{weightUtil}%</span>
                       </div>
                       <input
                         id="slider-util"
@@ -300,7 +300,7 @@ export default function AdminAnalystDashboard() {
                     <div>
                       <div className="flex justify-between mb-1.5">
                         <label htmlFor="slider-defaults" className="text-white font-medium">Adverse Listings & Defaults Penalty Weight:</label>
-                        <span className="font-mono text-[#fa4d56] font-bold">{weightDefaults}%</span>
+                        <span className="font-mono text-[#ff8389] font-bold">{weightDefaults}%</span>
                       </div>
                       <input
                         id="slider-defaults"
@@ -334,7 +334,7 @@ export default function AdminAnalystDashboard() {
 
                   <div className="pt-4 border-t border-[var(--cds-border-subtle)] flex items-center justify-between">
                     <div className="font-mono text-xs text-[var(--cds-text-secondary)]">
-                      Total Allocated Weight: <strong className={`text-sm ${weightRhi + weightUtil + weightHistory + weightDefaults + weightInquiries === 100 ? 'text-[#42be65]' : 'text-[#fa4d56]'}`}>{weightRhi + weightUtil + weightHistory + weightDefaults + weightInquiries}%</strong>
+                      Total Allocated Weight: <strong className={`text-sm ${weightRhi + weightUtil + weightHistory + weightDefaults + weightInquiries === 100 ? 'text-[#42be65]' : 'text-[#ff8389]'}`}>{weightRhi + weightUtil + weightHistory + weightDefaults + weightInquiries}%</strong>
                     </div>
 
                     <Button
@@ -371,7 +371,7 @@ export default function AdminAnalystDashboard() {
                   </div>
 
                   <div className="mt-6 pt-3 border-t border-[var(--cds-border-subtle)] text-[11px] text-[var(--cds-text-helper)] font-mono">
-                    APRA COMPLIANCE REVIEW: PASSED (PRUDENTIAL STANDARD APS 220)
+                    STATUTORY COMPLIANCE REVIEW: PASSED (PRIVACY ACT 1988 PART IIIA & CR CODE)
                   </div>
                 </div>
               </div>
@@ -394,7 +394,7 @@ export default function AdminAnalystDashboard() {
               {/* Error and 403 States */}
               {isForbiddenDisputes && (
                 <div className="p-4 bg-[var(--cds-layer-02)] border-l-4 border-[#da1e28] text-xs">
-                  <div className="font-bold text-[#fa4d56] uppercase">403 Forbidden: Insufficient Permissions</div>
+                  <div className="font-bold text-[#ff8389] uppercase">403 Forbidden: Insufficient Permissions</div>
                   <div className="text-[var(--cds-text-secondary)] mt-1">Your account role does not have authorization to view or adjudicate statutory credit disputes.</div>
                 </div>
               )}
@@ -452,7 +452,7 @@ export default function AdminAnalystDashboard() {
                           <td className="p-3 text-[#8d8d8d]">{d.filedDate}</td>
                           <td className="p-3 font-bold">
                             {d.daysRemaining > 0 ? (
-                              <span className={d.daysRemaining < 14 ? 'text-[#fa4d56]' : 'text-[#42be65]'}>
+                              <span className={d.daysRemaining < 14 ? 'text-[#ff8389]' : 'text-[#42be65]'}>
                                 {d.daysRemaining} Days Left
                               </span>
                             ) : (
@@ -624,7 +624,7 @@ export default function AdminAnalystDashboard() {
                 <div>[CHECK_1] MERKLE_TREE_ROOT: 7a82b904fc0192e104ca819201f42199201a0942cba8192104ab0192ca1bbdca</div>
                 <div>[CHECK_2] TRANSACTION_CHAIN_VALIDATION: 842,109 BLOCKS VERIFIED WITHOUT DISCREPANCY</div>
                 <div>[CHECK_3] BITEMPORAL_OVERWRITE_CHECK: 0 OVERWRITE DETECTIONS FOUND (100.0% COMPLIANT)</div>
-                <div className="text-white pt-2 border-t border-[#393939]">STATUS: AUDIT CERTIFICATE ISSUED (OAIC APRA COMPLIANT)</div>
+                <div className="text-white pt-2 border-t border-[#393939]">STATUS: AUDIT CERTIFICATE ISSUED (OAIC CR CODE COMPLIANT)</div>
               </div>
             </TabPanel>
           </TabPanels>

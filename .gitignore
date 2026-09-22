@@ -43,6 +43,8 @@ coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
+test-results/
+frontend/test-results/
 
 # Node.js & Next.js
 frontend/node_modules/
@@ -74,6 +76,7 @@ credit_system.db
 !.env.example
 .env.local
 backups/
+TEST_ACCOUNTS.md
 
 # OS Files
 .DS_Store

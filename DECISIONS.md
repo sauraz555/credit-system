@@ -74,3 +74,28 @@ This document records all architectural choices, engineering tradeoffs, and reso
 - **Concurrency & Latency Benchmarks**: Developed `scripts/load_test_k6.js` and `scripts/benchmark_latency.py`. Benchmark results confirmed:
   - Bitemporal Report Lookup: p95 = 110.55ms (Target: <500ms)
   - Data Ingestion: p95 = 214.05ms (Target: <500ms)
+
+## Follow-Up Sprint Decisions (2026-09-22)
+- **Axe-Core via Playwright (Automated A11y)**: Integrated `@axe-core/playwright` to conduct automated accessibility scans across 8 routes (public, forbidden, and authenticated role sessions: `/login`, `/403`, `/`, `/admin`, `/analyst`, `/provider`, `/subject`, `/subject/IND-8842-1994`) with seeded data in headless Chromium. Enforced WCAG 2.1 AA with zero permissible violations. Configured in `frontend/playwright.config.ts` and `frontend/package.json` (`npm run test:a11y`).
+- **Security Coverage Hardening ($\ge 90\%$)**: Implemented `backend/tests/test_security_coverage.py` containing 11 dedicated security tests targeting:
+  - Expired access token rejection (401).
+  - Refresh token rotation, revocation on reuse attempts, and token re-use theft detection.
+  - Wrong TOTP rejection and prevention of MFA bypass / skip.
+  - Progressive IP/user brute-force lockout after failed attempts.
+  - Complete token revocation upon logout endpoint call.
+  - Subject tenant cross-file isolation enforcement.
+  - Mandatory audit enquiry logging upon credit provider score lookup.
+  - Achieved `app.auth` 90%, `app.routers.auth_router` 93%, `app.routers.reports` 92%, total suite 87% with 50 passing tests.
+- **Database Production Guardrails**: Hardened `backend/app/database.py` such that when `ENVIRONMENT == "production"`, `DATABASE_URL` pointing to PostgreSQL is strictly required, throwing a fatal `RuntimeError` if SQLite fallback is attempted. SQLite is retained exclusively for local development environments lacking PostgreSQL/Docker daemons.
+- **Realistic Concurrent Load Benchmarking**: Built an asynchronous Python load test runner (`scripts/run_load_test.py`) simulating 50 virtual users executing bitemporal report lookups and 20 virtual users executing batch data ingestion concurrently over a 20-second window. Rate limiting was bypassed for the designated benchmark test user (`X-Benchmark-Test-User: true`). The benchmark yielded 490 requests at 22.93 req/s throughput with 0.000% errors.
+- **Seed Data Hygiene & Zero Tracked Secrets**: Enforced `ENVIRONMENT=development` requirement in `seed_data.py` and `seed_test_accounts.py`. Migrated all seed account email addresses to `@example.com`. Seed script generates fresh cryptographically secure random TOTP secrets per execution, storing them solely in `TEST_ACCOUNTS.md`, which is added to `.gitignore` and untracked from version control.
+- **Repository History Cleansing Runbook**: Documented standard administrator runbook in `REPO_CLEANUP.md` with exact `git-filter-repo` commands to purge `credit_system.db`, historical keys, and credentials from git history safely without impacting working state.
+- **Regulatory Framework Alignment**: Replaced all APRA APS 220 citations across the platform, codebases, and documentation with correct references to the Privacy Act 1988 (Cth) Part IIIA and the Privacy (Credit Reporting) Code 2014.
+- **Full End-to-End Enterprise Test Workflows**: Implemented Playwright E2E suite (`frontend/tests/e2e.spec.ts`) covering 6 complete multi-role user journeys:
+  1. Role-based authentication with TOTP MFA verification.
+  2. Credit provider CSV data ingestion and validation.
+  3. Credit provider score lookup automatically generating a mandatory bureau enquiry.
+  4. Consumer subject lodging a statutory dispute under Section 20V of the Privacy Act.
+  5. Risk analyst reviewing and resolving a statutory dispute.
+  6. Admin weight sum validation blocking configuration updates that do not equal 100%.
+

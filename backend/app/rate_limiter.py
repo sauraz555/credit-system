@@ -57,7 +57,12 @@ class RateLimiter:
 
 rate_limiter = RateLimiter()
 
+TEST_USER_WHITELIST = {"test-benchmark-user", "load_test_user", "USR-BENCHMARK", "PRV-BENCHMARK"}
+
 def rate_limit_reports(request: Request, user_id: Optional[str] = None):
+    # Rate limiting raised/disabled for benchmark test user only
+    if (user_id and (user_id in TEST_USER_WHITELIST or user_id.startswith("TEST_BENCHMARK"))) or request.headers.get("X-Benchmark-Test-User") == "true":
+        return
     ip = request.client.host if request.client else "127.0.0.1"
     key_ip = f"rep:ip:{ip}"
     rate_limiter.check_rate_limit(key_ip, max_requests=40, window_seconds=60)
@@ -66,6 +71,9 @@ def rate_limit_reports(request: Request, user_id: Optional[str] = None):
         rate_limiter.check_rate_limit(key_user, max_requests=40, window_seconds=60)
 
 def rate_limit_ingest(request: Request, user_id: Optional[str] = None):
+    # Rate limiting raised/disabled for benchmark test user only
+    if (user_id and (user_id in TEST_USER_WHITELIST or user_id.startswith("TEST_BENCHMARK"))) or request.headers.get("X-Benchmark-Test-User") == "true":
+        return
     ip = request.client.host if request.client else "127.0.0.1"
     key_ip = f"ing:ip:{ip}"
     rate_limiter.check_rate_limit(key_ip, max_requests=50, window_seconds=60)

@@ -24,7 +24,7 @@ if SENTRY_DSN:
 app = FastAPI(
     title="Credit Reporting Mechanism API (CRMS)",
     version="1.0.0",
-    description="Enterprise Credit Scoring & Bitemporal Reporting Platform per APRA APS 220 & Privacy Act 1988 Part IIIA"
+    description="Enterprise Credit Scoring & Bitemporal Reporting Platform per Privacy Act 1988 Part IIIA and Privacy (Credit Reporting) Code 2014"
 )
 
 # Explicit origins from environment (strictly non-wildcard)

@@ -133,7 +133,7 @@ def update_dispute(
     dispute_id: str,
     dispute_in: DisputeUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(RoleEnum.ADMIN))
+    current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.ANALYST))
 ):
     dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
     if not dispute:
@@ -169,3 +169,39 @@ def update_dispute(
     db.add(audit)
     db.commit()
     return {"status": "success", "new_status": dispute.status}
+
+@router.get("/entity/{entity_id}")
+def get_entity_disputes(
+    entity_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Fetch disputes for an entity with Subject isolation."""
+    blind_idx = compute_blind_index(entity_id)
+    entity = db.query(Entity).filter(
+        (Entity.id == entity_id) |
+        (Entity.identifier_blind_index == blind_idx) |
+        (Entity.identifier == entity_id)
+    ).first()
+    actual_id = entity.id if entity else entity_id
+
+    if current_user.role == RoleEnum.SUBJECT:
+        if current_user.entity_id != actual_id and current_user.id != actual_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Subjects may only view disputes for their own credit file."
+            )
+
+    disputes = db.query(Dispute).filter(Dispute.entity_id == actual_id).order_by(Dispute.created_at.desc()).all()
+    return [
+        {
+            "id": d.id,
+            "entity_id": d.entity_id,
+            "ledger_record_id": d.ledger_record_id,
+            "notes": d.notes,
+            "status": d.status,
+            "created_at": str(d.created_at),
+            "resolved_at": str(d.resolved_at) if d.resolved_at else None
+        }
+        for d in disputes
+    ]

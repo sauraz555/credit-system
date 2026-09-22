@@ -1,5 +1,5 @@
 # PostgreSQL Backup & Disaster Recovery Runbook
-**Compliance**: APRA Prudential Standard APS 220 (Credit Risk Management) & Privacy Act 1988 (Cth) Part IIIA
+**Compliance**: Privacy Act 1988 (Cth) Part IIIA & Privacy (Credit Reporting) Code 2014
 
 ---
 

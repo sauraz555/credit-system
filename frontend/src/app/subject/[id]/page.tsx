@@ -328,7 +328,7 @@ export default function CreditReportPage() {
               <div><span className="text-[var(--cds-text-helper)]">FILE NUMBER:</span> <span className="font-mono text-white">{entityId}</span></div>
               <div><span className="text-[var(--cds-text-helper)]">DOB:</span> <span className="text-white">{subjectDob}</span></div>
               <div><span className="text-[var(--cds-text-helper)]">ADDRESS:</span> <span className="text-white">{subjectAddress}</span></div>
-              <div><span className="text-[var(--cds-text-helper)]">JURISDICTION:</span> <span className="font-mono text-white">AU-NSW (APRA L3)</span></div>
+              <div><span className="text-[var(--cds-text-helper)]">JURISDICTION:</span> <span className="font-mono text-white">AU-NSW (Privacy Act Part IIIA)</span></div>
             </div>
           </div>
 
@@ -378,7 +378,7 @@ export default function CreditReportPage() {
         <div className="mb-6">
           <InlineNotification
             kind="info"
-            title="Formal Dispute Registered (OAIC / APRA Regulated)"
+            title="Formal Dispute Registered (Privacy Act 1988 Part IIIA s20V)"
             subtitle={disputeSuccessMsg}
             onCloseButtonClick={() => setDisputeSubmitted(false)}
             lowContrast
@@ -589,8 +589,8 @@ export default function CreditReportPage() {
                           <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
                             <td className="p-3 font-medium text-white">Telstra Consumer Default ($420)</td>
                             <td className="p-3 text-[var(--cds-text-secondary)]">Adverse Listing (Under Dispute)</td>
-                            <td className="p-3 text-[#fa4d56] font-mono font-bold">-45 pts</td>
-                            <td className="p-3 text-center"><ErrorIcon className="text-[#fa4d56] inline" size={16} /></td>
+                            <td className="p-3 text-[#ff8389] font-mono font-bold">-45 pts</td>
+                            <td className="p-3 text-center"><ErrorIcon className="text-[#ff8389] inline" size={16} /></td>
                           </tr>
                           <tr className="hover:bg-[var(--cds-layer-03)] transition-colors">
                             <td className="p-3 font-medium text-white">Recent Credit Velocity (3 Enquiries)</td>
@@ -600,7 +600,7 @@ export default function CreditReportPage() {
                           </tr>
                           <tr className="bg-[var(--cds-layer-01)] font-bold">
                             <td className="p-3 text-white" colSpan={2}>Net Calculated Credit Score</td>
-                            <td className="p-3 text-[#0f62fe] font-mono text-sm" colSpan={2}>
+                            <td className="p-3 text-[#78a9ff] font-mono text-sm" colSpan={2}>
                               712 / 1000
                             </td>
                           </tr>
@@ -649,13 +649,13 @@ export default function CreditReportPage() {
                           Live "What-If" Score Simulator
                         </h4>
                       </div>
-                      <span className="text-[10px] font-mono bg-[#002d9c] text-[#4589ff] px-2 py-0.5 border border-[#0043ce]">
+                      <span className="text-[10px] font-mono bg-[#002d9c] text-white px-2 py-0.5 border border-[#0043ce]">
                         Interactive Model
                       </span>
                     </div>
 
                     <p className="text-xs text-[var(--cds-text-secondary)] mb-6 leading-relaxed">
-                      Adjust hypothetical consumer actions to immediately observe simulated score variances calculated using APRA-aligned credit rules.
+                      Adjust hypothetical consumer actions to immediately observe simulated score variances calculated under Privacy Act 1988 Part IIIA and Privacy (Credit Reporting) Code rules.
                     </p>
 
                     {/* Simulator Controls */}
@@ -663,36 +663,32 @@ export default function CreditReportPage() {
                       {/* Control 1: Debt Paydown Slider */}
                       <div>
                         <div className="flex justify-between text-xs mb-2">
-                          <label htmlFor="sim-debt-paydown-slider" className="text-white font-medium">Pay Down Revolving Debt:</label>
-                          <span className="font-mono text-[#42be65] font-bold">${simDebtPaydown.toLocaleString()}</span>
+                          <label htmlFor="sim-debt-slider" className="font-medium text-white">Credit Card Balance Paydown ($AUD):</label>
+                          <span className="font-mono text-[var(--cds-link-primary)] font-bold">${simDebtPaydown}</span>
                         </div>
                         <input
-                          id="sim-debt-paydown-slider"
-                          aria-label="Pay down revolving debt slider"
+                          id="sim-debt-slider"
+                          aria-label="Credit Card Balance Paydown amount in AUD"
                           type="range"
                           min="0"
-                          max="12340"
+                          max="4120"
                           step="500"
                           value={simDebtPaydown}
                           onChange={(e) => setSimDebtPaydown(Number(e.target.value))}
                           className="w-full accent-[#0f62fe] cursor-pointer"
                         />
-                        <div className="flex justify-between text-[10px] font-mono text-[var(--cds-text-helper)] mt-1">
-                          <span>$0 (Current)</span>
-                          <span>$12,340 (Full Payoff)</span>
-                        </div>
                       </div>
 
-                      {/* Control 2: Resolve Disputed Default Toggle */}
+                      {/* Control 2: Default Removal Toggle */}
                       <div className="flex items-center justify-between p-3.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">
                         <div>
-                          <div className="text-xs font-medium text-white">Expunge Disputed Default ($420)</div>
-                          <div className="text-[11px] text-[var(--cds-text-secondary)]">Simulates favorable Section 20V dispute outcome</div>
+                          <div className="text-xs font-medium text-white">Expunge Telstra Default ($420)</div>
+                          <div className="text-[11px] text-[var(--cds-text-secondary)]">Simulates Section 20V dispute correction</div>
                         </div>
                         <button
                           type="button"
                           onClick={() => setSimRemoveDefault(!simRemoveDefault)}
-                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simRemoveDefault ? 'bg-[#24a148] text-white border-[#42be65]' : 'bg-[var(--cds-layer-03)] text-[#8d8d8d] border-transparent hover:text-white'}`}
+                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simRemoveDefault ? 'bg-[#24a148] text-white border-[#42be65]' : 'bg-[var(--cds-layer-03)] text-white border-transparent hover:text-white'}`}
                         >
                           {simRemoveDefault ? 'RESOLVED (+45)' : 'EXCLUDE'}
                         </button>
@@ -707,7 +703,7 @@ export default function CreditReportPage() {
                         <button
                           type="button"
                           onClick={() => setSimNewInquiry(!simNewInquiry)}
-                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simNewInquiry ? 'bg-[#da1e28] text-white border-[#fa4d56]' : 'bg-[var(--cds-layer-03)] text-[#8d8d8d] border-transparent hover:text-white'}`}
+                          className={`px-3 py-1 text-xs font-mono font-semibold border transition-all ${simNewInquiry ? 'bg-[#da1e28] text-white border-[#fa4d56]' : 'bg-[var(--cds-layer-03)] text-white border-transparent hover:text-white'}`}
                         >
                           {simNewInquiry ? 'APPLIED (-12)' : 'EXCLUDE'}
                         </button>
@@ -730,7 +726,7 @@ export default function CreditReportPage() {
                         </span>
                       </div>
 
-                      <div className={`font-mono text-sm font-bold ${simulatedScore >= snapshotData.score ? 'text-[#42be65]' : 'text-[#fa4d56]'}`}>
+                      <div className={`font-mono text-sm font-bold ${simulatedScore >= snapshotData.score ? 'text-[#42be65]' : 'text-[#ff8389]'}`}>
                         {simulatedScore >= snapshotData.score ? `+${simulatedScore - snapshotData.score}` : `${simulatedScore - snapshotData.score}`} pts delta
                       </div>
                     </div>
@@ -909,7 +905,7 @@ export default function CreditReportPage() {
                 <div>
                   <h2 className="text-lg font-medium text-white">Active Credit Accounts & CCR Tradelines</h2>
                   <p className="text-xs text-[var(--cds-text-secondary)]">
-                    Reported by APRA-licensed financial institutions under National Consumer Credit Protection Act 2009.
+                    Reported by eligible credit providers under Privacy Act 1988 Part IIIA and National Consumer Credit Protection Act 2009.
                   </p>
                 </div>
                 <span className="text-xs text-[var(--cds-text-secondary)]">

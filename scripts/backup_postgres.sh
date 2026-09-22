@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # CRMS Production PostgreSQL Automated Backup Script
-# APRA Prudential Standard APS 220 & Privacy Act 1988 Compliance
+# Privacy Act 1988 Part IIIA & Privacy (Credit Reporting) Code Compliance
 # ==============================================================================
 
 set -euo pipefail

@@ -1,15 +1,22 @@
 import os
 import sys
+import pyotp
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database import init_db, SessionLocal
+# Enforce environment guardrail
+if os.getenv("ENVIRONMENT") != "development":
+    raise RuntimeError(
+        "CRMS Data Hygiene Guardrail Violation: Seed script execution rejected! "
+        "ENVIRONMENT environment variable must be strictly set to 'development'."
+    )
+
+from app.database import SessionLocal
 from app.models import User, RoleEnum, Entity, EntityTypeEnum
 from app.auth import hash_password
 from app.encryption import encrypt_field, compute_blind_index
 
 def seed_accounts():
-    init_db()
     db = SessionLocal()
 
     # Ensure Jonathan Vance exists so subject account has valid entity
@@ -30,40 +37,45 @@ def seed_accounts():
         db.add(vance)
         db.commit()
 
+    # Generate cryptographically random MFA secrets per seed run
+    admin_totp = pyotp.random_base32()
+    analyst_totp = pyotp.random_base32()
+    provider_totp = pyotp.random_base32()
+
     test_users = [
         {
             "id": "usr_admin_001",
-            "email": "admin@bureau.gov.au",
+            "email": "admin@example.com",
             "password": "Sprint2026!Admin",
             "role": RoleEnum.ADMIN,
-            "totp_secret": "JBSWY3DPEHPK3PXP",
+            "totp_secret": admin_totp,
             "mfa_enabled": True,
             "tenant_id": None,
             "entity_id": None
         },
         {
             "id": "usr_analyst_001",
-            "email": "analyst@bureau.gov.au",
+            "email": "analyst@example.com",
             "password": "Sprint2026!Analyst",
             "role": RoleEnum.ANALYST,
-            "totp_secret": "JBSWY3DPEHPK3PXQ",
+            "totp_secret": analyst_totp,
             "mfa_enabled": True,
             "tenant_id": None,
             "entity_id": None
         },
         {
             "id": "usr_provider_001",
-            "email": "provider@cba.com.au",
+            "email": "provider@example.com",
             "password": "Sprint2026!Provider",
             "role": RoleEnum.PROVIDER,
-            "totp_secret": "JBSWY3DPEHPK3PXR",
+            "totp_secret": provider_totp,
             "mfa_enabled": True,
             "tenant_id": "PRV-CBA-001",
             "entity_id": None
         },
         {
             "id": "usr_subject_001",
-            "email": "subject@consumer.gov.au",
+            "email": "subject@example.com",
             "password": "Sprint2026!Subject",
             "role": RoleEnum.SUBJECT,
             "totp_secret": None,
@@ -73,34 +85,65 @@ def seed_accounts():
         }
     ]
 
+    # Cleanly remove any old test accounts to prevent duplicate id/email conflicts
+    db.query(User).filter(
+        User.email.in_([
+            "admin@example.com", "analyst@example.com", "provider@example.com", "subject@example.com",
+            "admin@bureau.gov.au", "analyst@bureau.gov.au", "provider@cba.com.au", "subject@consumer.gov.au"
+        ]) | User.id.in_(["usr_admin_001", "usr_analyst_001", "usr_provider_001", "usr_subject_001"])
+    ).delete(synchronize_session=False)
+    db.commit()
+
     for u_data in test_users:
-        existing = db.query(User).filter(User.email == u_data["email"]).first()
         hashed = hash_password(u_data["password"])
-        if existing:
-            existing.password_hash = hashed
-            existing.role = u_data["role"]
-            existing.totp_secret = u_data["totp_secret"]
-            existing.mfa_enabled = u_data["mfa_enabled"]
-            existing.tenant_id = u_data["tenant_id"]
-            existing.entity_id = u_data["entity_id"]
-            print(f"Updated user: {existing.email} ({existing.role.value})")
-        else:
-            new_user = User(
-                id=u_data["id"],
-                email=u_data["email"],
-                password_hash=hashed,
-                role=u_data["role"],
-                totp_secret=u_data["totp_secret"],
-                mfa_enabled=u_data["mfa_enabled"],
-                tenant_id=u_data["tenant_id"],
-                entity_id=u_data["entity_id"]
-            )
-            db.add(new_user)
-            print(f"Created user: {new_user.email} ({new_user.role.value})")
+        new_user = User(
+            id=u_data["id"],
+            email=u_data["email"],
+            password_hash=hashed,
+            role=u_data["role"],
+            totp_secret=u_data["totp_secret"],
+            mfa_enabled=u_data["mfa_enabled"],
+            tenant_id=u_data["tenant_id"],
+            entity_id=u_data["entity_id"]
+        )
+        db.add(new_user)
+        print(f"Created user: {new_user.email} ({new_user.role.value})")
 
     db.commit()
     db.close()
-    print("Seed test accounts completed successfully.")
+
+    # Write dynamic credentials to TEST_ACCOUNTS.md in root
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    test_accounts_path = os.path.join(root_dir, "TEST_ACCOUNTS.md")
+    
+    content = f"""# Test Accounts & Credentials (Dynamically Generated)
+# Auto-generated by seed script - Never commit secrets to version control.
+# Ignored by .gitignore per security policy.
+
+| Role | Email | Password | MFA Enabled | TOTP Secret (Base32) | Associated ID | Access Level |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **ADMIN** | `admin@example.com` | `Sprint2026!Admin` | Yes | `{admin_totp}` | N/A | Full administrative control, model activation, user management, audit logging |
+| **ANALYST** | `analyst@example.com` | `Sprint2026!Analyst` | Yes | `{analyst_totp}` | N/A | Dispute investigations, back-testing, bitemporal historical file inspection |
+| **PROVIDER** | `provider@example.com` | `Sprint2026!Provider` | Yes | `{provider_totp}` | `PRV-CBA-001` | Data ingestion within licensed categories (RHI, accounts, defaults) |
+| **SUBJECT** | `subject@example.com` | `Sprint2026!Subject` | No | None | `IND-8842-1994` | Self-service consumer credit file, score breakdowns, enquiry history, dispute filing |
+
+---
+
+## MFA Verification Details
+For accounts with MFA enabled (**Admin**, **Analyst**, **Provider**):
+1. Upon submitting email and password at `/login`, an interim `mfa_token` is returned with `mfa_required: true`.
+2. Enter the current 6-digit TOTP code generated from the corresponding TOTP Secret.
+
+### Generating TOTP code via CLI:
+```bash
+python -c "import pyotp; print('Admin TOTP:', pyotp.TOTP('{admin_totp}').now())"
+python -c "import pyotp; print('Analyst TOTP:', pyotp.TOTP('{analyst_totp}').now())"
+python -c "import pyotp; print('Provider TOTP:', pyotp.TOTP('{provider_totp}').now())"
+```
+"""
+    with open(test_accounts_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Dynamically generated credentials written to {test_accounts_path}")
 
 if __name__ == "__main__":
     seed_accounts()

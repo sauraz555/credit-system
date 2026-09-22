@@ -88,33 +88,23 @@ export default function CarbonShell({ children }: { children: React.ReactNode })
                 isActive={isSideNavExpanded}
                 aria-expanded={isSideNavExpanded}
               />
-              <Link href="/" passHref legacyBehavior>
-                <HeaderName prefix="IBM">
-                  Credit Reporting Mechanism &middot; <span className="font-mono text-xs text-[#8d8d8d] font-normal">v2.4-enterprise</span>
-                </HeaderName>
-              </Link>
+              <HeaderName href="/" prefix="IBM">
+                Credit Reporting Mechanism &middot; <span className="font-mono text-xs text-[#8d8d8d] font-normal">v2.4-enterprise</span>
+              </HeaderName>
 
               <HeaderNavigation aria-label="Primary Navigation">
-                <Link href="/subject/IND-8842-1994" passHref legacyBehavior>
-                  <HeaderMenuItem isActive={pathname?.includes('/subject')}>
-                    Consumer Report
-                  </HeaderMenuItem>
-                </Link>
-                <Link href="/subject" passHref legacyBehavior>
-                  <HeaderMenuItem isActive={pathname === '/subject'}>
-                    Commercial Entity
-                  </HeaderMenuItem>
-                </Link>
-                <Link href="/provider" passHref legacyBehavior>
-                  <HeaderMenuItem isActive={pathname?.includes('/provider')}>
-                    Provider Ingestion
-                  </HeaderMenuItem>
-                </Link>
-                <Link href="/admin" passHref legacyBehavior>
-                  <HeaderMenuItem isActive={pathname?.includes('/admin')}>
-                    Analyst & Disputes
-                  </HeaderMenuItem>
-                </Link>
+                <HeaderMenuItem href="/subject/IND-8842-1994" isActive={pathname?.includes('/subject')}>
+                  Consumer Report
+                </HeaderMenuItem>
+                <HeaderMenuItem href="/subject" isActive={pathname === '/subject'}>
+                  Commercial Entity
+                </HeaderMenuItem>
+                <HeaderMenuItem href="/provider" isActive={pathname?.includes('/provider')}>
+                  Provider Ingestion
+                </HeaderMenuItem>
+                <HeaderMenuItem href="/admin" isActive={pathname?.includes('/admin')}>
+                  Analyst & Disputes
+                </HeaderMenuItem>
               </HeaderNavigation>
               
               <HeaderGlobalBar>
@@ -124,7 +114,7 @@ export default function CarbonShell({ children }: { children: React.ReactNode })
                 >
                   {currentTheme === 'g100' ? <Light size={20} /> : <Asleep size={20} />}
                 </HeaderGlobalAction>
-                <HeaderGlobalAction aria-label="Global Search" onClick={() => {}}>
+                <HeaderGlobalAction aria-label="Search Regulatory Register" onClick={() => {}}>
                   <Search size={20} />
                 </HeaderGlobalAction>
                 <HeaderGlobalAction aria-label="System Notifications (2 new)" onClick={() => {}}>
@@ -148,11 +138,9 @@ export default function CarbonShell({ children }: { children: React.ReactNode })
                     <Logout size={20} />
                   </HeaderGlobalAction>
                 ) : (
-                  <Link href="/login" passHref legacyBehavior>
-                    <HeaderGlobalAction aria-label="Sign In">
-                      <UserAvatar size={20} />
-                    </HeaderGlobalAction>
-                  </Link>
+                  <HeaderGlobalAction aria-label="Sign In" onClick={() => window.location.href = '/login'}>
+                    <UserAvatar size={20} />
+                  </HeaderGlobalAction>
                 )}
               </HeaderGlobalBar>
               
@@ -165,32 +153,24 @@ export default function CarbonShell({ children }: { children: React.ReactNode })
               >
                 <SideNavItems>
                   <SideNavMenu title="Credit Subjects" defaultExpanded={pathname?.includes('/subject') || pathname === '/'}>
-                    <Link href="/subject/IND-8842-1994" passHref legacyBehavior>
-                      <SideNavMenuItem isActive={pathname === '/subject/IND-8842-1994'}>
-                        Individual (Jonathan Vance)
-                      </SideNavMenuItem>
-                    </Link>
-                    <Link href="/subject" passHref legacyBehavior>
-                      <SideNavMenuItem isActive={pathname === '/subject'}>
-                        Commercial (Apex Holdings)
-                      </SideNavMenuItem>
-                    </Link>
+                    <SideNavMenuItem href="/subject/IND-8842-1994" isActive={pathname === '/subject/IND-8842-1994'}>
+                      Individual (Jonathan Vance)
+                    </SideNavMenuItem>
+                    <SideNavMenuItem href="/subject" isActive={pathname === '/subject'}>
+                      Commercial (Apex Holdings)
+                    </SideNavMenuItem>
                   </SideNavMenu>
                   
                   <SideNavMenu title="Data Providers" defaultExpanded={pathname?.includes('/provider')}>
-                    <Link href="/provider" passHref legacyBehavior>
-                      <SideNavMenuItem isActive={pathname === '/provider'}>
-                        Bulk Ingestion (NAB-001)
-                      </SideNavMenuItem>
-                    </Link>
+                    <SideNavMenuItem href="/provider" isActive={pathname === '/provider'}>
+                      Bulk Ingestion (NAB-001)
+                    </SideNavMenuItem>
                   </SideNavMenu>
 
                   <SideNavMenu title="Analyst & Auditing" defaultExpanded={pathname?.includes('/admin')}>
-                    <Link href="/admin" passHref legacyBehavior>
-                      <SideNavMenuItem isActive={pathname === '/admin'}>
-                        Model Engine & Disputes
-                      </SideNavMenuItem>
-                    </Link>
+                    <SideNavMenuItem href="/admin" isActive={pathname === '/admin'}>
+                      Platform Governance
+                    </SideNavMenuItem>
                   </SideNavMenu>
                 </SideNavItems>
               </SideNav>

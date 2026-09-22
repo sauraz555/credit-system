@@ -3,13 +3,21 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from app.models import Base
 
-# Support PostgreSQL, fallback to SQLite for local without docker
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_SQLITE_PATH = os.path.join(BASE_DIR, "credit_system.db").replace("\\", "/")
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    f"sqlite:///{DEFAULT_SQLITE_PATH}"
-)
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if ENVIRONMENT == "production":
+    if not DATABASE_URL or not (DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")):
+        raise RuntimeError(
+            "CRITICAL PRODUCTION CONFIG ERROR: SQLite fallback is strictly prohibited in production. "
+            "A valid PostgreSQL connection string must be provided via DATABASE_URL."
+        )
+else:
+    if not DATABASE_URL:
+        DATABASE_URL = f"sqlite:///{DEFAULT_SQLITE_PATH}"
 
 # Connect args specific to sqlite for multi-threading
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}

@@ -6,7 +6,14 @@ from faker import Faker
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database import init_db, SessionLocal
+# Enforce environment guardrail
+if os.getenv("ENVIRONMENT") != "development":
+    raise RuntimeError(
+        "CRMS Data Hygiene Guardrail Violation: Seed script execution rejected! "
+        "ENVIRONMENT environment variable must be strictly set to 'development'."
+    )
+
+from app.database import SessionLocal
 from app.models import (
     Entity, EntityTypeEnum, DirectorLink, CreditLedger, 
     RecordTypeEnum, RecordStatusEnum

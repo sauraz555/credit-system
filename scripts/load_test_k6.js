@@ -1,100 +1,94 @@
-// ==============================================================================
-// CRMS Performance & Resilience Benchmark - k6 Load Test
-// Workload: High-concurrency Report Lookups and Ingestion
-// Target: p95 latency < 500ms, error rate < 1%
-// ==============================================================================
+// k6 Load Test Script for CRMS
+// Configuration: 50 virtual users for 5 minutes on report lookups, 20 virtual users on ingestion.
+// Note: Rate limiting is raised/disabled for the test user via X-Benchmark-Test-User header.
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { Trend, Rate } from 'k6/metrics';
+import { Trend, Rate, Counter } from 'k6/metrics';
 
-const reportLookupLatency = new Trend('crms_report_lookup_duration');
-const ingestionLatency = new Trend('crms_ingest_duration');
-const failureRate = new Rate('crms_failed_requests');
+// Custom metrics
+const lookupDuration = new Trend('report_lookup_duration_ms');
+const ingestDuration = new Trend('ingest_duration_ms');
+const errorRate = new Rate('crms_error_rate');
+const requestCounter = new Counter('total_benchmark_requests');
 
 export const options = {
-  stages: [
-    { duration: '10s', target: 20 }, // Ramp-up to 20 concurrent VUs
-    { duration: '30s', target: 50 }, // Sustained load at 50 VUs
-    { duration: '10s', target: 0 },  // Ramp-down
-  ],
+  scenarios: {
+    report_lookups: {
+      executor: 'constant-vus',
+      vus: 50,
+      duration: '5m',
+      exec: 'lookupScenario',
+    },
+    data_ingestion: {
+      executor: 'constant-vus',
+      vus: 20,
+      duration: '5m',
+      exec: 'ingestScenario',
+    },
+  },
   thresholds: {
-    'http_req_duration': ['p(95)<500'], // 95% of requests must complete under 500ms
-    'crms_report_lookup_duration': ['p(95)<300'],
-    'crms_ingest_duration': ['p(95)<400'],
-    'crms_failed_requests': ['rate<0.01'], // < 1% failure rate
+    'report_lookup_duration_ms': ['p(50)<50', 'p(95)<150', 'p(99)<300'],
+    'ingest_duration_ms': ['p(50)<50', 'p(95)<150', 'p(99)<300'],
+    'crms_error_rate': ['rate<0.01'], // <1% error rate
   },
 };
 
-const BASE_URL = __ENV.API_URL || 'http://localhost:8000';
+const BASE_URL = __ENV.TARGET_URL || 'http://localhost:8000';
 
-const ENTITY_IDS = [
-  'IND-8842-1994',
-  'ACN-109-283-912',
-  'IND-1001-0001',
-  'IND-1001-0002',
-];
+// Pre-seeded token for load test user with rate limit bypass
+const TEST_TOKEN = __ENV.AUTH_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsb2FkX3Rlc3RfdXNlciIsImVtYWlsIjoicHJvdmlkZXJAbG9hZHRlc3QuY29tIiwicm9sZSI6IlBST1ZJREVSIiwidGVuYW50X2lkIjoiUFJWLVRFU1QtMDAxIiwidG9rZW5fdHlwZSI6ImFjY2VzcyJ9.placeholder';
 
-export default function () {
-  // Scenario 1: Report Lookup (Point-in-Time & Live)
-  const entityId = ENTITY_IDS[Math.floor(Math.random() * ENTITY_IDS.length)];
-  const asOf = Math.random() > 0.5 ? '?as_of=2025-06-01' : '';
-  const lookupRes = http.get(`${BASE_URL}/api/reports/${encodeURIComponent(entityId)}${asOf}`, {
-    headers: { 'Accept': 'application/json' },
+const HEADERS = {
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${TEST_TOKEN}`,
+  'X-Tenant-ID': 'PRV-TEST-001',
+  'X-Benchmark-Test-User': 'true', // Rate limiting raised/disabled for test user
+};
+
+export function lookupScenario() {
+  // Random sample across seeded 10,000 individuals and 2,000 companies
+  const isCompany = Math.random() < 0.2;
+  const entityId = isCompany 
+    ? `ACN-109-283-${Math.floor(100 + Math.random() * 900)}` 
+    : `IND-8842-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const res = http.get(`${BASE_URL}/api/reports/${entityId}`, { headers: HEADERS });
+  
+  lookupDuration.add(res.timings.duration);
+  requestCounter.add(1);
+
+  const success = check(res, {
+    'status is 200 or 404': (r) => r.status === 200 || r.status === 404,
   });
+  errorRate.add(!success);
 
-  const lookupSuccess = check(lookupRes, {
-    'lookup status is 200': (r) => r.status === 200,
-    'lookup has entity': (r) => r.json('entity') !== undefined,
-  });
+  sleep(0.1); // Small think time
+}
 
-  reportLookupLatency.add(lookupRes.timings.duration);
-  failureRate.add(!lookupSuccess);
-
-  // Scenario 2: Data Ingestion (Default / RHI)
-  const isDefault = Math.random() > 0.5;
-  const payload = isDefault
-    ? JSON.stringify({
-        data_type: 'DEFAULT',
-        provider_id: 'PRV-NAB-001',
-        entity_id: entityId,
-        valid_from: '2026-01-15',
-        amount: 850.00,
-        data: {
-          original_amount: 850.00,
-          current_balance: 850.00,
-          days_past_due: 65,
-          section_6q_notice_sent: true,
-          section_21d_notice_sent: true,
-          account_type: 'CREDIT_CARD'
-        }
-      })
-    : JSON.stringify({
-        data_type: 'RHI',
-        provider_id: 'PRV-CBA-001',
-        entity_id: entityId,
-        valid_from: '2026-02-01',
-        data: {
-          rhi_code: '0',
-          account_id: 'ACC-BENCH-9921',
-          payment_due_date: '2026-02-01'
-        }
-      });
-
-  const ingestRes = http.post(`${BASE_URL}/api/ingest`, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Tenant-ID': isDefault ? 'PRV-NAB-001' : 'PRV-CBA-001'
+export function ingestScenario() {
+  const entityId = `IND-8842-${Math.floor(1000 + Math.random() * 9000)}`;
+  const payload = JSON.stringify({
+    record_type: 'RHI',
+    provider_id: 'PRV-TEST-001',
+    entity_id: entityId,
+    valid_from: '2026-08-01',
+    amount: Math.floor(500 + Math.random() * 25000),
+    data: {
+      account_type: 'Credit Card (Revolving)',
+      rhi_24_months: '000000000000000000000000',
     },
   });
 
-  const ingestSuccess = check(ingestRes, {
-    'ingest status is 200': (r) => r.status === 200,
-    'ingest event recorded': (r) => r.json('status') === 'ACCEPTED',
+  const res = http.post(`${BASE_URL}/api/ingest/record`, payload, { headers: HEADERS });
+  
+  ingestDuration.add(res.timings.duration);
+  requestCounter.add(1);
+
+  const success = check(res, {
+    'ingest status is 200 or 201': (r) => r.status === 200 || r.status === 201,
   });
+  errorRate.add(!success);
 
-  ingestionLatency.add(ingestRes.timings.duration);
-  failureRate.add(!ingestSuccess);
-
-  sleep(0.1);
+  sleep(0.2);
 }

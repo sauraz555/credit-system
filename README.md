@@ -2,7 +2,7 @@
 
 An institutional-grade Comprehensive Credit Reporting (CCR) system operating in compliance with:
 - **Privacy Act 1988 (Cth) Part IIIA** (Statutory credit reporting, 24-month RHI, Section 20V dispute adjudication)
-- **APRA Prudential Standard APS 220** (Credit Risk Management & Corporate Group Contagion Protocols)
+- **Privacy (Credit Reporting) Code 2014 (CR Code)** (Operational credit reporting code and rules)
 - **National Consumer Credit Protection Act 2009** (NCCP Act & Responsible Lending)
 
 Built on a **FastAPI (Python)** backend with an immutable bitemporal ledger, deterministic scoring engine, Celery data retention tasks, and an enterprise **IBM Carbon Design System (`@carbon/react`)** Next.js web application.
@@ -113,5 +113,4 @@ pytest tests/ -v
 
 ## Regulatory Compliance Reference
 - **Part IIIA, Privacy Act 1988 (Cth)**: Comprehensive Credit Reporting statutory rules, permitted disclosures, and data retention schedules.
-- **Privacy (Credit Reporting) Code 2014**: Operational code governing exchange of credit information between credit providers and credit reporting bodies (CRBs).
-- **APRA Prudential Standard APS 220**: Credit quality management and corporate group contagion standards.
+- **Privacy (Credit Reporting) Code 2014 (CR Code)**: Operational code governing exchange of credit information between credit providers and credit reporting bodies (CRBs), corrections, and dispute resolutions.

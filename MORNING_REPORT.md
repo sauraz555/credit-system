@@ -1,14 +1,14 @@
 # CRMS AUTONOMOUS FIX SPRINT — MORNING REPORT
 **Execution Date**: 2026-09-22  
 **Target Branch**: `fix-sprint`  
-**Regulatory Standards**: APRA Prudential Standard APS 220 (Credit Risk Management) & Privacy Act 1988 (Cth) Part IIIA (Credit Reporting)
+**Regulatory Standards**: Privacy Act 1988 (Cth) Part IIIA & Privacy (Credit Reporting) Code 2014
 
 ---
 
 ## 1. Executive Summary & Compliance Status Table
 
 > [!IMPORTANT]
-> **Production Readiness Assessment**: The system has completed all 6 sprint milestones with verified automated test gates, cryptographic controls, and accessibility conformance. However, per instructions, **this system is NOT described as production-ready** pending final production deployment staging, live external directory certification, and live APRA/OAIC compliance sign-off. Below is the objective audit of what passes, what fails, and what is not done.
+> **Production Readiness Assessment**: The system has completed all 6 sprint milestones with verified automated test gates, cryptographic controls, and accessibility conformance. However, per instructions, **this system is NOT described as production-ready** pending final production deployment staging, live external directory certification, and live OAIC compliance sign-off. Below is the objective audit of what passes, what fails, and what is not done.
 
 | # | Sprint Requirement | Status | Evidence / Verification Test |
 | :--- | :--- | :---: | :--- |
@@ -144,7 +144,7 @@ Measured via `scripts/benchmark_latency.py` with multi-threaded concurrent workl
 
 | Item / Domain | Status | Reason / Technical Barrier | Required Prerequisites for Production |
 | :--- | :---: | :--- | :--- |
-| **External APRA/ASIC API Connectors** | NOT BUILT | The environment is air-gapped without real APRA/ASIC subscription credentials. | Provision live ASIC company registry API credentials and APRA portal webhooks. |
+| **External ASIC API Connectors** | NOT BUILT | The environment is air-gapped without real ASIC subscription credentials. | Provision live ASIC company registry API credentials. |
 | **SMS Carrier MFA Gateway** | NOT BUILT | TOTP authenticator app was implemented per RFC 6238; SMS OTP requires a commercial telco aggregator (e.g. Twilio/MessageMedia). | Configure SMS provider API keys if carrier SMS OTP is mandated by policy. |
 | **Hardware Security Module (HSM)** | NOT BUILT | Software AES-256-GCM and HMAC-SHA256 keys are managed via environment variables. | Integrate AWS KMS, Azure Key Vault, or PKCS#11 HSM for production hardware root of trust. |
 

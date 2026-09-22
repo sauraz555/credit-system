@@ -258,7 +258,7 @@ function CommercialSubjectContent() {
             size="sm"
             kind="primary"
             renderIcon={Download}
-            onClick={() => alert(`Exporting ASIC & APRA certified commercial risk file for ${company.name}...`)}
+            onClick={() => alert(`Exporting ASIC & Privacy Act Part IIIA certified commercial risk file for ${company.name}...`)}
           >
             Export Certified PDF
           </Button>
@@ -268,7 +268,7 @@ function CommercialSubjectContent() {
       {/* 403 Forbidden State */}
       {isForbidden && (
         <div className="p-4 bg-[var(--cds-layer-02)] border-l-4 border-[#da1e28] text-xs mb-6">
-          <div className="font-bold text-[#fa4d56] uppercase">403 Forbidden: Commercial File Access Restricted</div>
+          <div className="font-bold text-[#ff8389] uppercase">403 Forbidden: Commercial File Access Restricted</div>
           <div className="text-[var(--cds-text-secondary)] mt-1">Your role does not have authorization to inspect commercial corporate credit files.</div>
         </div>
       )}
@@ -342,7 +342,7 @@ function CommercialSubjectContent() {
             </div>
             <div>
               <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">Bureau Risk Assessment</span>
-              <span className="text-[#4589ff] font-bold">{company.riskTier}</span>
+              <span className="text-[#78a9ff] font-bold">{company.riskTier}</span>
             </div>
             <div>
               <span className="text-[var(--cds-text-helper)] block text-[10px] uppercase">ASIC Registration</span>
@@ -548,7 +548,7 @@ function CommercialSubjectContent() {
                   </svg>
 
                   <div className="absolute bottom-3 left-4 text-[10px] font-mono text-[var(--cds-text-helper)]">
-                    APRA APS 220 Contagion Protocol &bull; Zero Adverse Directorships Detected
+                    Director Contagion Risk Analysis &bull; Zero Adverse Directorships Detected
                   </div>
                 </div>
 
@@ -572,23 +572,29 @@ function CommercialSubjectContent() {
                         <div className="text-[10px] uppercase font-mono text-[var(--cds-text-helper)]">
                           Other Monitored Directorships:
                         </div>
-                        {dir.associatedEntities.map((ent: any, eIdx: number) => (
-                          <div
-                            key={eIdx}
-                            className="p-2.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-center justify-between"
-                          >
-                            <div>
-                              <div className="text-xs text-white font-medium">{ent.name}</div>
-                              <div className="text-[10px] font-mono text-[var(--cds-text-helper)]">{ent.acn}</div>
+                        {(dir.associatedEntities && dir.associatedEntities.length > 0) ? (
+                          dir.associatedEntities.map((ent: any, eIdx: number) => (
+                            <div
+                              key={eIdx}
+                              className="p-2.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] flex items-center justify-between"
+                            >
+                              <div>
+                                <div className="text-xs text-white font-medium">{ent.name}</div>
+                                <div className="text-[10px] font-mono text-[var(--cds-text-helper)]">{ent.acn}</div>
+                              </div>
+                              <div className="text-right">
+                                <Tag type={ent.riskTag as any} size="sm" className="m-0 font-mono">
+                                  {ent.status}
+                                </Tag>
+                                <div className="text-[10px] text-[#8d8d8d] mt-1">PAYDEX: {ent.score}</div>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <Tag type={ent.riskTag as any} size="sm" className="m-0 font-mono">
-                                {ent.status}
-                              </Tag>
-                              <div className="text-[10px] text-[#8d8d8d] mt-1">PAYDEX: {ent.score}</div>
-                            </div>
+                          ))
+                        ) : (
+                          <div className="p-2.5 bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] text-xs text-[var(--cds-text-secondary)] italic">
+                            No external corporate cross-directorships or contagion links detected.
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
                   ))}
@@ -643,9 +649,9 @@ function CommercialSubjectContent() {
 
             {/* TAB 4: FINANCIAL RATIOS */}
             <TabPanel className="p-5 md:p-6">
-              <h2 className="text-lg font-medium text-white mb-2">Statutory Liquidity & Capital Ratios (APRA APS 220)</h2>
+              <h2 className="text-lg font-medium text-white mb-2">Commercial Financial Ratios & Credit Benchmarks</h2>
               <p className="text-xs text-[var(--cds-text-secondary)] mb-4">
-                Prudential financial health benchmarks derived from audited filings and corporate tax disclosures.
+                Financial health benchmarks derived from audited filings and corporate disclosures.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
                 <div className="p-4 bg-[var(--cds-layer-02)] border border-[var(--cds-border-subtle)]">

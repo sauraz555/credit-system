@@ -56,11 +56,11 @@ function LoginForm() {
       }
 
       if (data.mfa_required) {
-        setMfaToken(data.mfa_token);
+        setMfaToken(data.mfa_token || data.temp_token);
         setPendingUser(data.user);
-        if (data.user?.email === 'admin@bureau.gov.au') setMfaSecretHint('JBSWY3DPEHPK3PXP');
-        else if (data.user?.email === 'analyst@bureau.gov.au') setMfaSecretHint('JBSWY3DPEHPK3PXQ');
-        else if (data.user?.email === 'provider@cba.com.au') setMfaSecretHint('JBSWY3DPEHPK3PXR');
+        if (data.user?.email === 'admin@example.com' || data.user?.email === 'admin@bureau.gov.au') setMfaSecretHint('MRYYKLJ3GNBXCF3JLRIBHR6QV4IFLCN2');
+        else if (data.user?.email === 'analyst@example.com' || data.user?.email === 'analyst@bureau.gov.au') setMfaSecretHint('WLNJMOIXHFS442MVSNNA5WQJE74JWV3I');
+        else if (data.user?.email === 'provider@example.com' || data.user?.email === 'provider@cba.com.au') setMfaSecretHint('FKH56R4XUAXHWHFGNX3QE5TY6KFOOMOH');
         setIsLoading(false);
         return;
       }
@@ -146,8 +146,8 @@ function LoginForm() {
     <div style={{ maxWidth: '640px', margin: '3rem auto', padding: '0 1.5rem' }}>
         <Tile style={{ padding: '2.5rem', borderTop: '4px solid #0f62fe' }}>
           <div style={{ marginBottom: '2rem' }}>
-            <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#0f62fe', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              APRA PRUDENTIAL AUTHENTICATION GATEWAY
+            <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#78a9ff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              BUREAU IDENTITY & ACCESS GATEWAY (PRIVACY ACT PART IIIA)
             </span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 600, margin: '0.25rem 0 0.5rem 0' }}>
               {mfaToken ? 'Two-Factor Authentication (MFA)' : 'Platform Identity Access'}
@@ -264,7 +264,7 @@ function LoginForm() {
             </span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginTop: '0.75rem' }}>
               <div 
-                onClick={() => fillQuickAccount('admin@bureau.gov.au', 'Sprint2026!Admin')}
+                onClick={() => fillQuickAccount('admin@example.com', 'Sprint2026!Admin')}
                 style={{ padding: '0.75rem', background: 'var(--cds-layer-01)', cursor: 'pointer', border: '1px solid var(--cds-border-subtle)', borderRadius: '2px' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -272,12 +272,12 @@ function LoginForm() {
                   <Tag type="red" size="sm">ADMIN</Tag>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', marginTop: '0.25rem' }}>
-                  admin@bureau.gov.au (MFA)
+                  admin@example.com (MFA)
                 </div>
               </div>
 
               <div 
-                onClick={() => fillQuickAccount('analyst@bureau.gov.au', 'Sprint2026!Analyst')}
+                onClick={() => fillQuickAccount('analyst@example.com', 'Sprint2026!Analyst')}
                 style={{ padding: '0.75rem', background: 'var(--cds-layer-01)', cursor: 'pointer', border: '1px solid var(--cds-border-subtle)', borderRadius: '2px' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -285,12 +285,12 @@ function LoginForm() {
                   <Tag type="purple" size="sm">ANALYST</Tag>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', marginTop: '0.25rem' }}>
-                  analyst@bureau.gov.au (MFA)
+                  analyst@example.com (MFA)
                 </div>
               </div>
 
               <div 
-                onClick={() => fillQuickAccount('provider@cba.com.au', 'Sprint2026!Provider')}
+                onClick={() => fillQuickAccount('provider@example.com', 'Sprint2026!Provider')}
                 style={{ padding: '0.75rem', background: 'var(--cds-layer-01)', cursor: 'pointer', border: '1px solid var(--cds-border-subtle)', borderRadius: '2px' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -298,12 +298,12 @@ function LoginForm() {
                   <Tag type="teal" size="sm">PROVIDER</Tag>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', marginTop: '0.25rem' }}>
-                  provider@cba.com.au (MFA)
+                  provider@example.com (MFA)
                 </div>
               </div>
 
               <div 
-                onClick={() => fillQuickAccount('subject@consumer.gov.au', 'Sprint2026!Subject')}
+                onClick={() => fillQuickAccount('subject@example.com', 'Sprint2026!Subject')}
                 style={{ padding: '0.75rem', background: 'var(--cds-layer-01)', cursor: 'pointer', border: '1px solid var(--cds-border-subtle)', borderRadius: '2px' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -311,7 +311,7 @@ function LoginForm() {
                   <Tag type="blue" size="sm">SUBJECT</Tag>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', marginTop: '0.25rem' }}>
-                  subject@consumer.gov.au (No MFA)
+                  subject@example.com
                 </div>
               </div>
             </div>

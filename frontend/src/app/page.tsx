@@ -99,7 +99,7 @@ export default function Home() {
           </div>
           <span className="text-[var(--cds-border-strong)]">|</span>
           <span className="text-[var(--cds-text-secondary)]">
-            APRA Reporting Window: <strong className="text-white">{stats.reporting_window}</strong>
+            Bureau Reporting Window: <strong className="text-white">{stats.reporting_window}</strong>
           </span>
           <span className="text-[var(--cds-border-strong)] hidden md:inline">|</span>
           <span className="text-[var(--cds-text-secondary)] hidden md:inline">
@@ -121,7 +121,7 @@ export default function Home() {
               Credit Bureau Intelligence Platform
             </h1>
             <p className="text-sm text-[var(--cds-text-secondary)] mt-1.5 max-w-3xl">
-              Regulated Comprehensive Credit Reporting (CCR) system operating under Part IIIA of the Privacy Act 1988 (Cth), APRA Prudential Practice Guide 220, and the National Consumer Credit Protection Act 2009.
+              Regulated Comprehensive Credit Reporting (CCR) system operating under Part IIIA of the Privacy Act 1988 (Cth), the Privacy (Credit Reporting) Code 2014, and the National Consumer Credit Protection Act 2009.
             </p>
           </div>
 

@@ -755,7 +755,7 @@ export default function AnalystWorkspace() {
                     <InlineNotification
                       kind="info"
                       title="Governance Notice: "
-                      subtitle="Under APRA CPS 220 and internal risk governance, credit analysts may run simulations and audit discrimination metrics, but only Bureau Administrators may activate models into production."
+                      subtitle="Under Privacy (Credit Reporting) Code governance and internal risk controls, credit analysts may run simulations and audit discrimination metrics, but only Bureau Administrators may activate models into production."
                     />
                   </div>
                 ) : (

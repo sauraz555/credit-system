@@ -31,7 +31,7 @@ export default function ForbiddenPage() {
               <MisuseOutline size={32} style={{ fill: '#da1e28' }} />
             </div>
             <div>
-              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#da1e28', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#ff8389', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 HTTP 403 &middot; Access Denied
               </span>
               <h1 style={{ fontSize: '1.75rem', fontWeight: 600, margin: '0.25rem 0 0 0' }}>
@@ -50,17 +50,15 @@ export default function ForbiddenPage() {
           />
 
           <p style={{ color: 'var(--cds-text-secondary)', lineHeight: 1.6, marginBottom: '2rem' }}>
-            Under the Australian Prudential Regulation Authority (APRA) and National Consumer Credit Protection guidelines,
+            Under Privacy Act 1988 Part IIIA, the Privacy (Credit Reporting) Code, and National Consumer Credit Protection guidelines,
             access to regulatory files, raw ingestion endpoints, and administrative engine modules is strictly partitioned
             by credentialed role clearance.
           </p>
 
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <Link href="/" passHref legacyBehavior>
-              <Button renderIcon={ArrowLeft} kind="secondary">
-                Return to Directory
-              </Button>
-            </Link>
+            <Button renderIcon={ArrowLeft} kind="secondary" onClick={() => window.location.href = '/'}>
+              Return to Directory
+            </Button>
             <Button renderIcon={Logout} kind="danger--ghost" onClick={handleLogout}>
               Switch Account / Re-authenticate
             </Button>
