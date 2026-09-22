@@ -23,12 +23,10 @@ import {
   TextInput,
   PasswordInput,
   Button,
-  Tile,
   InlineNotification,
-  Loading,
   Tag
 } from '@carbon/react';
-import { Login, Locked, UserAvatar, ArrowRight, Reset, Information, Security } from '@carbon/icons-react';
+import { Login, Reset, Security } from '@carbon/icons-react';
 import { API_BASE, checkBackendHealth } from '@/lib/api';
 
 /**
@@ -174,203 +172,199 @@ function LoginForm() {
   };
 
   return (
-    <div style={{ maxWidth: '640px', margin: '3rem auto', padding: '0 1.5rem' }}>
-        <Tile style={{ padding: '2.5rem', borderTop: '4px solid #0f62fe' }}>
-          <div style={{ marginBottom: '2rem' }}>
-            <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#78a9ff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              BUREAU IDENTITY & ACCESS GATEWAY (PRIVACY ACT PART IIIA)
-            </span>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 600, margin: '0.25rem 0 0.5rem 0' }}>
-              {mfaToken ? 'Two-Factor Authentication (MFA)' : 'Platform Identity Access'}
-            </h1>
-            <p style={{ color: 'var(--cds-text-secondary)', fontSize: '0.875rem' }}>
-              {mfaToken
-                ? `Enter the 6-digit Time-based One-Time Password (TOTP) from your authenticator device for ${pendingUser?.email}.`
-                : 'Authenticate with your credentialed enterprise role to access partitioned regulatory portals.'}
-            </p>
+    <div className="max-w-[480px] mx-auto py-8">
+      {/* Page Title & Subtitle */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
+          {mfaToken ? 'Two-Factor Verification' : 'Sign in'}
+        </h1>
+        <p className="text-xs text-[#999999] mt-1">
+          {mfaToken
+            ? `Enter the 6-digit Time-based One-Time Password (TOTP) from your authenticator device for ${pendingUser?.email}.`
+            : 'Enter your credentials to access the Credit Reporting Mechanism.'}
+        </p>
+      </div>
+
+      {/* Inline Offline Notice */}
+      {backendOffline && (
+        <InlineNotification
+          kind="warning"
+          title="Demo backend not connected. Set NEXT_PUBLIC_API_URL."
+          lowContrast
+          hideCloseButton
+          className="mb-4"
+        />
+      )}
+
+      {errorMsg && (
+        <InlineNotification
+          kind="error"
+          title="Authentication Failure"
+          subtitle={errorMsg}
+          lowContrast
+          onCloseButtonClick={() => setErrorMsg(null)}
+          className="mb-4"
+        />
+      )}
+
+      {successMsg && (
+        <InlineNotification
+          kind="success"
+          title="Authorized"
+          subtitle={successMsg}
+          lowContrast
+          hideCloseButton
+          className="mb-4"
+        />
+      )}
+
+      {!mfaToken ? (
+        <form onSubmit={handleLoginSubmit} className="space-y-4">
+          <TextInput
+            id="login-email"
+            labelText="Corporate Email Address"
+            placeholder="name@bureau.gov.au"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={isLoading}
+          />
+          <PasswordInput
+            id="login-password"
+            labelText="Argon2 Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={isLoading}
+          />
+
+          <div className="pt-2">
+            <Button
+              type="submit"
+              renderIcon={isLoading ? undefined : Login}
+              disabled={isLoading || !email || !password}
+              className="w-full"
+            >
+              {isLoading ? 'Verifying...' : 'Sign In'}
+            </Button>
           </div>
+        </form>
+      ) : (
+        <form onSubmit={handleMfaSubmit} className="space-y-4">
+          <TextInput
+            id="mfa-code"
+            labelText="6-Digit Authenticator Code"
+            placeholder="123456"
+            value={totpCode}
+            maxLength={6}
+            onChange={(e) => setTotpCode(e.target.value)}
+            required
+            disabled={isLoading}
+            autoFocus
+          />
 
-          {backendOffline && (
-            <InlineNotification
-              kind="warning"
-              title="Demo backend not connected. Set NEXT_PUBLIC_API_URL."
-              subtitle={`The frontend is attempting to communicate with ${API_BASE}. To connect a live backend, deploy the FastAPI service and set the NEXT_PUBLIC_API_URL environment variable.`}
-              lowContrast
-              hideCloseButton
-              style={{ marginBottom: '1.5rem' }}
-            />
+          {mfaSecretHint && (
+            <div className="bg-[#1c1c21] p-3 text-xs border-l-2 border-[#0f62fe]">
+              <span className="font-semibold text-[#e6e6e6]">Test Secret (Base32): </span>
+              <code className="text-[#0f62fe]">{mfaSecretHint}</code>
+            </div>
           )}
 
-          {errorMsg && (
-            <InlineNotification
-              kind="error"
-              title="Authentication Failure"
-              subtitle={errorMsg}
-              lowContrast
-              onCloseButtonClick={() => setErrorMsg(null)}
-              style={{ marginBottom: '1.5rem' }}
-            />
-          )}
+          <div className="pt-2 flex gap-3">
+            <Button
+              type="submit"
+              renderIcon={isLoading ? undefined : Security}
+              disabled={isLoading || totpCode.trim().length !== 6}
+              className="flex-1"
+            >
+              {isLoading ? 'Verifying...' : 'Verify MFA'}
+            </Button>
+            <Button
+              kind="secondary"
+              renderIcon={Reset}
+              onClick={() => {
+                setMfaToken(null);
+                setTotpCode('');
+              }}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
 
-          {successMsg && (
-            <InlineNotification
-              kind="success"
-              title="Authorized"
-              subtitle={successMsg}
-              lowContrast
-              hideCloseButton
-              style={{ marginBottom: '1.5rem' }}
-            />
-          )}
-
-          {!mfaToken ? (
-            <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <TextInput
-                id="login-email"
-                labelText="Corporate Email Address"
-                placeholder="name@bureau.gov.au"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-              <PasswordInput
-                id="login-password"
-                labelText="Argon2 Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-
-              <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
-                <Button
-                  type="submit"
-                  renderIcon={isLoading ? undefined : Login}
-                  disabled={isLoading || !email || !password}
-                  style={{ flex: 1 }}
-                >
-                  {isLoading ? 'Verifying Identity...' : 'Sign In'}
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleMfaSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <TextInput
-                id="mfa-code"
-                labelText="6-Digit Authenticator Code"
-                placeholder="123456"
-                value={totpCode}
-                maxLength={6}
-                onChange={(e) => setTotpCode(e.target.value)}
-                required
-                disabled={isLoading}
-                autoFocus
-              />
-
-              {mfaSecretHint && (
-                <div style={{ background: 'var(--cds-layer-02)', padding: '0.75rem', fontSize: '0.8rem', borderLeft: '3px solid #0f62fe' }}>
-                  <span style={{ fontWeight: 600 }}>Test Secret (Base32): </span>
-                  <code style={{ color: '#0f62fe' }}>{mfaSecretHint}</code>
-                </div>
-              )}
-
-              <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
-                <Button
-                  type="submit"
-                  renderIcon={isLoading ? undefined : Security}
-                  disabled={isLoading || totpCode.trim().length !== 6}
-                  style={{ flex: 1 }}
-                >
-                  {isLoading ? 'Verifying MFA Token...' : 'Verify MFA & Enter'}
-                </Button>
-                <Button
-                  kind="secondary"
-                  renderIcon={Reset}
-                  onClick={() => {
-                    setMfaToken(null);
-                    setTotpCode('');
-                  }}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {/* Quick-Fill Seed Accounts Card */}
-          <div style={{ marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--cds-border-subtle)' }}>
-            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--cds-text-secondary)', fontWeight: 600, letterSpacing: '0.05em' }}>
-              Quick Test Role Accounts (Sprint Seeded):
-            </span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginTop: '0.75rem' }}>
-              <div 
-                onClick={() => fillQuickAccount('admin@example.com', 'Sprint2026!Admin')}
-                style={{ padding: '0.75rem', background: 'var(--cds-layer-01)', cursor: 'pointer', border: '1px solid var(--cds-border-subtle)', borderRadius: '2px' }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Admin</span>
-                  <Tag type="red" size="sm">ADMIN</Tag>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', marginTop: '0.25rem' }}>
-                  admin@example.com (MFA)
-                </div>
-              </div>
-
-              <div 
-                onClick={() => fillQuickAccount('analyst@example.com', 'Sprint2026!Analyst')}
-                style={{ padding: '0.75rem', background: 'var(--cds-layer-01)', cursor: 'pointer', border: '1px solid var(--cds-border-subtle)', borderRadius: '2px' }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Analyst</span>
-                  <Tag type="purple" size="sm">ANALYST</Tag>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', marginTop: '0.25rem' }}>
-                  analyst@example.com (MFA)
-                </div>
-              </div>
-
-              <div 
-                onClick={() => fillQuickAccount('provider@example.com', 'Sprint2026!Provider')}
-                style={{ padding: '0.75rem', background: 'var(--cds-layer-01)', cursor: 'pointer', border: '1px solid var(--cds-border-subtle)', borderRadius: '2px' }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Provider (CBA)</span>
-                  <Tag type="teal" size="sm">PROVIDER</Tag>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', marginTop: '0.25rem' }}>
-                  provider@example.com (MFA)
-                </div>
-              </div>
-
-              <div 
-                onClick={() => fillQuickAccount('subject@example.com', 'Sprint2026!Subject')}
-                style={{ padding: '0.75rem', background: 'var(--cds-layer-01)', cursor: 'pointer', border: '1px solid var(--cds-border-subtle)', borderRadius: '2px' }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Subject (Vance)</span>
-                  <Tag type="blue" size="sm">SUBJECT</Tag>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', marginTop: '0.25rem' }}>
-                  subject@example.com
-                </div>
-              </div>
+      {/* Quick-Fill Seed Accounts */}
+      <div className="mt-8 pt-6 border-t border-[#202026]">
+        <span className="text-[11px] uppercase text-[#999999] font-medium tracking-wider block mb-3">
+          Quick Test Persona Accounts:
+        </span>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div 
+            onClick={() => fillQuickAccount('admin@example.com', 'Sprint2026!Admin')}
+            className="p-2.5 bg-[#141417] hover:bg-[#1c1c21] cursor-pointer border border-[#202026] rounded-[2px] transition-colors"
+          >
+            <div className="flex justify-between items-center">
+              <span className="font-medium text-[#e6e6e6]">Admin</span>
+              <Tag type="red" size="sm">ADMIN</Tag>
+            </div>
+            <div className="text-[10px] text-[#999999] font-mono mt-1">
+              admin@example.com
             </div>
           </div>
-        </Tile>
+
+          <div 
+            onClick={() => fillQuickAccount('analyst@example.com', 'Sprint2026!Analyst')}
+            className="p-2.5 bg-[#141417] hover:bg-[#1c1c21] cursor-pointer border border-[#202026] rounded-[2px] transition-colors"
+          >
+            <div className="flex justify-between items-center">
+              <span className="font-medium text-[#e6e6e6]">Analyst</span>
+              <Tag type="purple" size="sm">ANALYST</Tag>
+            </div>
+            <div className="text-[10px] text-[#999999] font-mono mt-1">
+              analyst@example.com
+            </div>
+          </div>
+
+          <div 
+            onClick={() => fillQuickAccount('provider@example.com', 'Sprint2026!Provider')}
+            className="p-2.5 bg-[#141417] hover:bg-[#1c1c21] cursor-pointer border border-[#202026] rounded-[2px] transition-colors"
+          >
+            <div className="flex justify-between items-center">
+              <span className="font-medium text-[#e6e6e6]">Provider (CBA)</span>
+              <Tag type="teal" size="sm">PROVIDER</Tag>
+            </div>
+            <div className="text-[10px] text-[#999999] font-mono mt-1">
+              provider@example.com
+            </div>
+          </div>
+
+          <div 
+            onClick={() => fillQuickAccount('subject@example.com', 'Sprint2026!Subject')}
+            className="p-2.5 bg-[#141417] hover:bg-[#1c1c21] cursor-pointer border border-[#202026] rounded-[2px] transition-colors"
+          >
+            <div className="flex justify-between items-center">
+              <span className="font-medium text-[#e6e6e6]">Subject (Vance)</span>
+              <Tag type="blue" size="sm">SUBJECT</Tag>
+            </div>
+            <div className="text-[10px] text-[#999999] font-mono mt-1">
+              subject@example.com
+            </div>
+          </div>
+        </div>
       </div>
+    </div>
   );
 }
 
 /**
  * Exported Login page wrapped in React Suspense boundary for client-side search parameter parsing.
  *
- * @returns JSX.Element rendering the suspended LoginForm component.
+ * @returns JSX.Element rendering the suspended LoginForm component immediately.
  */
 export default function LoginPage() {
   return (
-    <React.Suspense fallback={<Loading description="Loading identity portal..." />}>
+    <React.Suspense fallback={null}>
       <LoginForm />
     </React.Suspense>
   );

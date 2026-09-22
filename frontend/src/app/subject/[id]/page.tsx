@@ -24,8 +24,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
   Tabs,
   TabList,
   Tab,
@@ -302,27 +300,24 @@ export default function CreditReportPage() {
   };
 
   return (
-    <div className={`p-4 md:p-8 max-w-[1680px] mx-auto ${isCompact ? 'text-xs' : 'text-sm'}`}>
-      {/* Top Breadcrumb & Action Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-3 border-b border-[var(--cds-border-subtle)]">
-        <Breadcrumb noTrailingSlash>
-          <BreadcrumbItem>
-            <Link href="/" className="text-[var(--cds-link-primary)] hover:underline">CRMS Root</Link>
-          </BreadcrumbItem>
-          <BreadcrumbItem>
-            <Link href="/subject" className="text-[var(--cds-link-primary)] hover:underline">Consumer Directory</Link>
-          </BreadcrumbItem>
-          <BreadcrumbItem isCurrentPage className="font-mono text-white">
-            {entityId}
-          </BreadcrumbItem>
-        </Breadcrumb>
+    <div className={`space-y-6 ${isCompact ? 'text-xs' : 'text-sm'}`}>
+      {/* Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
+            Consumer Credit File: {subjectName}
+          </h1>
+          <p className="text-xs text-[#999999] mt-1">
+            Comprehensive credit file, 24-month repayment history (RHI), and dispute management under Privacy Act Part IIIA.
+          </p>
+        </div>
 
         <div className="flex items-center gap-3">
           <Button
             size="sm"
             kind="ghost"
             onClick={() => setIsCompact(!isCompact)}
-            className="text-xs text-[var(--cds-text-secondary)] hover:text-white"
+            className="text-xs text-[#999999] hover:text-white"
           >
             Density: {isCompact ? 'Compact' : 'Standard'}
           </Button>
@@ -342,49 +337,49 @@ export default function CreditReportPage() {
             renderIcon={Download}
             onClick={() => alert(`Generating cryptographic bureau statement for ${entityId}...`)}
           >
-            Export Official PDF
+            Export PDF
           </Button>
         </div>
       </div>
 
       {/* Primary Subject Metadata Strip */}
-      <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 mb-6">
+      <div className="bg-[#141417] border border-[#202026] p-5 rounded-[2px]">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-1.5">
-              <h1 className="text-2xl md:text-3xl font-light text-white tracking-tight">
+              <h2 className="text-xl font-light text-[#e6e6e6] tracking-tight">
                 {subjectName}
-              </h1>
+              </h2>
               <Tag type="green" size="sm" className="font-mono m-0">ACTIVE / VERIFIED</Tag>
               <Tag type="blue" size="sm" className="font-mono m-0">CCR COMPLIANT</Tag>
             </div>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-[var(--cds-text-secondary)]">
-              <div><span className="text-[var(--cds-text-helper)]">FILE NUMBER:</span> <span className="font-mono text-white">{entityId}</span></div>
-              <div><span className="text-[var(--cds-text-helper)]">DOB:</span> <span className="text-white">{subjectDob}</span></div>
-              <div><span className="text-[var(--cds-text-helper)]">ADDRESS:</span> <span className="text-white">{subjectAddress}</span></div>
-              <div><span className="text-[var(--cds-text-helper)]">JURISDICTION:</span> <span className="font-mono text-white">AU-NSW (Privacy Act Part IIIA)</span></div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-[#999999]">
+              <div><span className="text-[#777777]">FILE NUMBER:</span> <span className="font-mono text-[#e6e6e6]">{entityId}</span></div>
+              <div><span className="text-[#777777]">DOB:</span> <span className="text-[#e6e6e6]">{subjectDob}</span></div>
+              <div><span className="text-[#777777]">ADDRESS:</span> <span className="text-[#e6e6e6]">{subjectAddress}</span></div>
+              <div><span className="text-[#777777]">JURISDICTION:</span> <span className="font-mono text-[#e6e6e6]">AU-NSW (Privacy Act Part IIIA)</span></div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-xs bg-[var(--cds-layer-02)] px-4 py-3 border border-[var(--cds-border-subtle)]">
+          <div className="flex items-center gap-4 text-xs bg-[#1c1c21] px-4 py-3 border border-[#202026] rounded-[2px]">
             <div>
-              <div className="text-[var(--cds-text-helper)] uppercase text-[10px] tracking-wider">As-Of Ledger State</div>
-              <div className="font-mono font-bold text-white flex items-center gap-2">
+              <div className="text-[#777777] uppercase text-[10px] tracking-wider">As-Of Ledger State</div>
+              <div className="font-mono font-bold text-[#e6e6e6] flex items-center gap-2">
                 {isLoadingTimeTravel ? <InlineLoading status="active" description="Traveling..." /> : snapshotData.lastUpdated}
               </div>
             </div>
-            <div className="border-l border-[var(--cds-border-subtle)] pl-4">
-              <div className="text-[var(--cds-text-helper)] uppercase text-[10px] tracking-wider">Ledger State</div>
-              <div className="font-mono text-[#42be65] font-semibold">SYNCED (Bitemporal)</div>
+            <div className="border-l border-[#202026] pl-4">
+              <div className="text-[#777777] uppercase text-[10px] tracking-wider">Ledger State</div>
+              <div className="font-mono text-[#24a148] font-semibold">SYNCED (Bitemporal)</div>
             </div>
           </div>
         </div>
 
         {/* Bitemporal Time Machine Scrubber */}
-        <div className="mt-4 pt-3 border-t border-[var(--cds-border-subtle)] flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-[var(--cds-text-secondary)]">
+        <div className="mt-4 pt-3 border-t border-[#202026] flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-[#999999]">
             <Time size={16} className="text-[#0f62fe]" />
-            <span className="font-semibold text-white">Bitemporal Time Machine:</span>
+            <span className="font-semibold text-[#e6e6e6]">Bitemporal Time Machine:</span>
             <span>Inspect historical score snapshot as committed at:</span>
           </div>
 
@@ -398,7 +393,7 @@ export default function CreditReportPage() {
               <button
                 key={b.key}
                 onClick={() => handleTimeTravel(b.key)}
-                className={`px-3 py-1 border transition-colors ${asOfDate === b.key ? 'bg-[#0f62fe] text-white border-[#0f62fe] font-bold' : 'bg-[var(--cds-layer-02)] text-[var(--cds-text-secondary)] border-[var(--cds-border-subtle)] hover:text-white hover:border-[var(--cds-border-strong)]'}`}
+                className={`px-3 py-1 border transition-colors rounded-[2px] ${asOfDate === b.key ? 'bg-[#0f62fe] text-white border-[#0f62fe] font-bold' : 'bg-[#1c1c21] text-[#999999] border-[#202026] hover:text-[#e6e6e6] hover:border-[#3e3e48]'}`}
               >
                 {b.label}
               </button>
@@ -409,7 +404,7 @@ export default function CreditReportPage() {
 
       {/* Dispute Alert Notification if submitted */}
       {disputeSubmitted && (
-        <div className="mb-6">
+        <div>
           <InlineNotification
             kind="info"
             title="Formal Dispute Registered (Privacy Act 1988 Part IIIA s20V)"
@@ -419,147 +414,6 @@ export default function CreditReportPage() {
           />
         </div>
       )}
-
-      {/* 4-Column Dense Financial KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* KPI 1: Credit Score */}
-        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-xs text-[var(--cds-text-secondary)] uppercase tracking-wider font-semibold mb-2">
-              <span>Comprehensive Bureau Score</span>
-              <Tag type={snapshotData.bandColor as any} size="sm" className="m-0 font-mono">
-                {snapshotData.band}
-              </Tag>
-            </div>
-
-            <div className="flex items-baseline gap-3 my-2">
-              <span className="text-5xl font-mono font-bold leading-none text-white tabular-nums">
-                {snapshotData.score}
-              </span>
-              <div className="text-xs font-mono text-[#42be65] font-semibold">
-                ▲ +14 pts (30d)
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="flex justify-between text-[10px] font-mono text-[var(--cds-text-helper)] mb-1">
-              <span>0 (Subprime)</span>
-              <span>500 (Base)</span>
-              <span>1000 (Super-Prime)</span>
-            </div>
-            {/* Calibrated score bar with zones */}
-            <div className="w-full h-2 bg-[var(--cds-layer-02)] relative overflow-hidden flex">
-              <div className="h-full bg-[#da1e28]" style={{ width: '30%' }} />
-              <div className="h-full bg-[#f1c21b]" style={{ width: '20%' }} />
-              <div className="h-full bg-[#0f62fe]" style={{ width: '25%' }} />
-              <div className="h-full bg-[#24a148]" style={{ width: '25%' }} />
-              <div 
-                className="absolute top-0 bottom-0 w-1.5 bg-white -ml-0.5" 
-                style={{ left: `${(snapshotData.score / 1000) * 100}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-xs text-[var(--cds-text-secondary)] mt-2.5">
-              <span>12m Default Risk (PD): <strong className="font-mono text-white">1.42%</strong></span>
-              <span>Rank: <strong className="text-white">Top 32%</strong></span>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI 2: Credit Exposure & Utilisation */}
-        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-xs text-[var(--cds-text-secondary)] uppercase tracking-wider font-semibold mb-2">
-              <span>Revolving Exposure</span>
-              <span className="text-xs text-[var(--cds-text-helper)]">4 Active Lines</span>
-            </div>
-
-            <div className="my-2">
-              <div className="text-3xl font-mono font-bold text-white tabular-nums">
-                ${snapshotData.totalDebt.toLocaleString()} <span className="text-xs text-[var(--cds-text-helper)] font-normal font-sans">/ $48,500</span>
-              </div>
-              <div className="text-xs text-[var(--cds-text-secondary)] mt-1.5">
-                Aggregate Revolving Utilisation: <strong className="font-mono text-white">{snapshotData.utilization}%</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="w-full h-2 bg-[var(--cds-layer-02)] relative overflow-hidden">
-              <div 
-                className={`h-full ${snapshotData.utilization > 50 ? 'bg-[#da1e28]' : snapshotData.utilization > 30 ? 'bg-[#f1c21b]' : 'bg-[#0f62fe]'}`}
-                style={{ width: `${Math.min(100, snapshotData.utilization)}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-xs text-[var(--cds-text-secondary)] mt-2.5">
-              <span>Available Line: <strong className="font-mono text-white">${(48500 - snapshotData.totalDebt).toLocaleString()}</strong></span>
-              <span className="text-[#42be65] font-semibold">Benchmark &lt;30%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI 3: Adverse Listings & Infringements */}
-        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-xs text-[var(--cds-text-secondary)] uppercase tracking-wider font-semibold mb-2">
-              <span>Adverse & Defaults</span>
-              <Tag type={snapshotData.defaultTagColor as any} size="sm" className="m-0 font-mono">
-                {snapshotData.defaultStatus}
-              </Tag>
-            </div>
-
-            <div className="my-2">
-              <div className="text-3xl font-mono font-bold text-white tabular-nums">
-                1 Listing <span className="text-xs text-[var(--cds-text-helper)] font-normal font-sans">($420.00)</span>
-              </div>
-              <div className="text-xs text-[var(--cds-text-secondary)] mt-1.5">
-                Listed by Telstra Corp &bull; Dispute Active
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-[var(--cds-border-subtle)] pt-3 text-xs text-[var(--cds-text-secondary)] space-y-1">
-            <div className="flex justify-between">
-              <span>Serious Infringements:</span>
-              <span className="font-mono text-white font-bold">0</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Court Writs / Judgments:</span>
-              <span className="font-mono text-white font-bold">0</span>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI 4: Credit Velocity & Inquiries */}
-        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-xs text-[var(--cds-text-secondary)] uppercase tracking-wider font-semibold mb-2">
-              <span>Credit Velocity</span>
-              <span className="text-xs text-[var(--cds-text-helper)]">Low Risk Profile</span>
-            </div>
-
-            <div className="my-2">
-              <div className="text-3xl font-mono font-bold text-white tabular-nums">
-                3 <span className="text-xs text-[var(--cds-text-helper)] font-normal font-sans">Inquiries (12m)</span>
-              </div>
-              <div className="text-xs text-[var(--cds-text-secondary)] mt-1.5">
-                0 Hard Inquiries in past 90 days
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-[var(--cds-border-subtle)] pt-3 text-xs text-[var(--cds-text-secondary)] space-y-1">
-            <div className="flex justify-between">
-              <span>Average Account Age:</span>
-              <span className="font-mono text-white font-bold">6.4 Years</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Oldest Trade Line:</span>
-              <span className="text-white">11y (NAB Mortgage)</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Main Multi-Tab Enterprise Report Sections */}
       <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)]">

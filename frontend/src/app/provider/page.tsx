@@ -22,8 +22,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
   Tabs,
   TabList,
   Tab,
@@ -270,49 +268,21 @@ export default function ProviderDashboard() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-[1680px] mx-auto">
-      {/* Breadcrumb & Action Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-3 border-b border-[var(--cds-border-subtle)]">
-        <Breadcrumb noTrailingSlash>
-          <BreadcrumbItem>
-            <Link href="/" className="text-[var(--cds-link-primary)] hover:underline">CRMS Root</Link>
-          </BreadcrumbItem>
-          <BreadcrumbItem isCurrentPage className="font-mono text-white">
-            Credit Provider Gateway
-          </BreadcrumbItem>
-        </Breadcrumb>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
+            Credit Provider Ingestion Console
+          </h1>
+          <p className="text-xs text-[#999999] mt-1">
+            CCR data submission, bitemporal validation, and permissible statutory credit enquiry execution.
+          </p>
+        </div>
 
         <div className="flex items-center gap-3 text-xs">
-          <Tag type="green" size="sm" className="font-mono m-0">ACL #230692 VALIDATED</Tag>
-          <Tag type="blue" size="sm" className="font-mono m-0">CCR PARTICIPANT</Tag>
-        </div>
-      </div>
-
-      {/* Primary Gateway Header */}
-      <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-1.5">
-              <h1 className="text-2xl md:text-3xl font-light text-white tracking-tight">
-                Credit Provider Ingestion Console
-              </h1>
-              <Tag type="purple" size="sm" className="font-mono m-0">{userEntityId || 'PRV-PARTICIPANT'}</Tag>
-            </div>
-            <p className="text-xs text-[var(--cds-text-secondary)]">
-              Authorized endpoint for comprehensive credit data exchange under the Privacy (Credit Reporting) Code 2014 (CR Code).
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs font-mono bg-[var(--cds-layer-02)] px-4 py-3 border border-[var(--cds-border-subtle)]">
-            <div>
-              <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Active API Key</div>
-              <div className="text-white">crms_live_prv_gateway</div>
-            </div>
-            <div className="border-l border-[var(--cds-border-subtle)] pl-4">
-              <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Monthly Ingestion Quota</div>
-              <div className="text-[#42be65]">14,290 / 50,000 Records</div>
-            </div>
-          </div>
+          <Tag type="purple" size="sm" className="font-mono m-0">{userEntityId || 'PRV-PARTICIPANT'}</Tag>
+          <Tag type="green" size="sm" className="font-mono m-0">ACL #230692</Tag>
         </div>
       </div>
 

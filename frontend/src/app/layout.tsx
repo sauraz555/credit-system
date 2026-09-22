@@ -15,7 +15,7 @@
 
 import type { Metadata } from "next";
 import "./globals.css";
-import CarbonShell from "@/components/CarbonShell";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "Credit Reporting Mechanism",
@@ -34,22 +34,22 @@ export interface RootLayoutProps {
  * Root Next.js HTML and body wrapper for the entire application.
  *
  * @param props - RootLayoutProps containing children elements.
- * @returns JSX.Element defining the HTML structure and persistent CarbonShell wrapper.
+ * @returns JSX.Element defining the HTML structure and persistent AppShell wrapper.
  */
 export default function RootLayout({
   children,
 }: RootLayoutProps) {
   return (
-    <html lang="en">
+    <html lang="en" data-carbon-theme="g100">
       <head>
         <link rel="stylesheet" href="/carbon.css" />
         <link rel="stylesheet" href="https://1.www.s81c.com/common/carbon/plex/sans.css" />
         <link rel="stylesheet" href="https://1.www.s81c.com/common/carbon/plex/mono.css" />
       </head>
-      <body>
-        <CarbonShell>
+      <body className="bg-[#0b0b0d] text-[#e6e6e6]">
+        <AppShell>
           {children}
-        </CarbonShell>
+        </AppShell>
       </body>
     </html>
   );

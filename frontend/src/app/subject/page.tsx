@@ -23,8 +23,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
   Tabs,
   TabList,
   Tab,
@@ -250,31 +248,28 @@ function CommercialSubjectContent() {
   ];
 
   return (
-    <div className="p-4 md:p-8 max-w-[1680px] mx-auto">
-      {/* Breadcrumb & Global Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-3 border-b border-[var(--cds-border-subtle)]">
-        <Breadcrumb noTrailingSlash>
-          <BreadcrumbItem>
-            <Link href="/" className="text-[var(--cds-link-primary)] hover:underline">CRMS Root</Link>
-          </BreadcrumbItem>
-          <BreadcrumbItem>
-            <Link href="/subject" className="text-[var(--cds-link-primary)] hover:underline">Commercial Directory</Link>
-          </BreadcrumbItem>
-          <BreadcrumbItem isCurrentPage className="font-mono text-white">
-            {company.acn}
-          </BreadcrumbItem>
-        </Breadcrumb>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
+            Commercial Credit Intelligence
+          </h1>
+          <p className="text-xs text-[#999999] mt-1">
+            Corporate credit evaluation, PAYDEX trade promptness scoring, and director contagion mapping.
+          </p>
+        </div>
 
         <div className="flex items-center gap-3">
           {/* Quick company switcher */}
           <div className="flex items-center gap-2 text-xs">
-            <label htmlFor="switch-registered-entity" className="text-[var(--cds-text-secondary)]">Switch Registered Entity:</label>
+            <label htmlFor="switch-registered-entity" className="text-[#999999]">Entity:</label>
             <select
               id="switch-registered-entity"
               aria-label="Switch Registered Entity"
               value={selectedEntityId}
               onChange={(e) => setSelectedEntityId(e.target.value)}
-              className="bg-[var(--cds-field)] text-white text-xs px-2.5 py-1.5 border border-[var(--cds-border-subtle)] focus:outline-none focus:border-[#0f62fe]"
+              className="bg-[#141417] text-[#e6e6e6] text-xs px-2.5 py-1.5 border border-[#202026] focus:outline-none focus:border-[#0f62fe] rounded-[2px]"
             >
               <option value="ACN-109-283-912">Apex Industrial Holdings (ACN-109-283-912)</option>
               {companyList.map((c) => (
@@ -289,24 +284,24 @@ function CommercialSubjectContent() {
             size="sm"
             kind="primary"
             renderIcon={Download}
-            onClick={() => alert(`Exporting ASIC & Privacy Act Part IIIA certified commercial risk file for ${company.name}...`)}
+            onClick={() => alert(`Exporting certified commercial risk file for ${company.name}...`)}
           >
-            Export Certified PDF
+            Export PDF
           </Button>
         </div>
       </div>
 
       {/* 403 Forbidden State */}
       {isForbidden && (
-        <div className="p-4 bg-[var(--cds-layer-02)] border-l-4 border-[#da1e28] text-xs mb-6">
-          <div className="font-bold text-[#ff8389] uppercase">403 Forbidden: Commercial File Access Restricted</div>
-          <div className="text-[var(--cds-text-secondary)] mt-1">Your role does not have authorization to inspect commercial corporate credit files.</div>
+        <div className="p-4 bg-[#1c1c21] border-l-2 border-[#da1e28] text-xs">
+          <div className="font-bold text-[#da1e28] uppercase">403 Forbidden: Commercial File Access Restricted</div>
+          <div className="text-[#999999] mt-1">Your role does not have authorization to inspect commercial corporate credit files.</div>
         </div>
       )}
 
       {/* Error State */}
       {reportError && !isForbidden && (
-        <div className="mb-6">
+        <div>
           <InlineNotification
             kind="error"
             title="Unable to Retrieve Corporate File"
@@ -318,49 +313,49 @@ function CommercialSubjectContent() {
 
       {/* Loading Skeleton */}
       {isLoadingApi && !company && (
-        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-8 mb-6 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
+        <div className="bg-[#141417] border border-[#202026] p-8 text-center text-xs font-mono text-[#999999]">
           <InlineLoading description="Loading verified commercial credit file..." />
         </div>
       )}
 
       {/* Empty State */}
       {!isLoadingApi && !company && !isForbidden && !reportError && (
-        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-8 mb-6 text-center text-xs font-mono text-[var(--cds-text-secondary)]">
+        <div className="bg-[#141417] border border-[#202026] p-8 text-center text-xs font-mono text-[#999999]">
           No commercial entity record found for ID: {selectedEntityId}. Select another registered entity above.
         </div>
       )}
 
-      {/* Primary Commercial Entity Header */}
+      {/* Primary Commercial Entity Details */}
       {company && (
-        <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 mb-6">
+        <div className="bg-[#141417] border border-[#202026] p-5 rounded-[2px]">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1.5">
-                <h1 className="text-2xl md:text-3xl font-light text-white tracking-tight">
+                <h2 className="text-xl font-light text-[#e6e6e6] tracking-tight">
                   {company.name}
-                </h1>
+                </h2>
                 <Tag type="teal" size="sm" className="font-mono m-0">PROPRIETARY LIMITED</Tag>
                 <Tag type="green" size="sm" className="font-mono m-0">{company.status}</Tag>
-                {isLoadingApi && <InlineLoading status="active" description="Syncing ledger..." />}
+                {isLoadingApi && <InlineLoading status="active" description="Syncing..." />}
               </div>
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-[var(--cds-text-secondary)]">
-                <div><span className="text-[var(--cds-text-helper)]">ACN:</span> <span className="font-mono text-white">{company.acn}</span></div>
-                <div><span className="text-[var(--cds-text-helper)]">ABN:</span> <span className="font-mono text-white">{company.abn}</span></div>
-                <div><span className="text-[var(--cds-text-helper)]">INDUSTRY:</span> <span className="text-white">{company.industry}</span></div>
-                <div><span className="text-[var(--cds-text-helper)]">REGISTERED:</span> <span className="text-white">{company.registeredOffice}</span></div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-[#999999]">
+                <div><span className="text-[#777777]">ACN:</span> <span className="font-mono text-[#e6e6e6]">{company.acn}</span></div>
+                <div><span className="text-[#777777]">ABN:</span> <span className="font-mono text-[#e6e6e6]">{company.abn}</span></div>
+                <div><span className="text-[#777777]">INDUSTRY:</span> <span className="text-[#e6e6e6]">{company.industry}</span></div>
+                <div><span className="text-[#777777]">REGISTERED:</span> <span className="text-[#e6e6e6]">{company.registeredOffice}</span></div>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 text-xs bg-[var(--cds-layer-02)] px-4 py-3 border border-[var(--cds-border-subtle)]">
+            <div className="flex items-center gap-4 text-xs bg-[#1c1c21] px-4 py-3 border border-[#202026] rounded-[2px]">
               <div>
-                <div className="text-[var(--cds-text-helper)] uppercase text-[10px] tracking-wider">PAYDEX Commercial Score</div>
-                <div className="font-mono text-2xl font-bold text-white flex items-center gap-2">
-                  {company.paydexScore} <span className="text-xs text-[var(--cds-text-helper)] font-normal">/ 100</span>
+                <div className="text-[#777777] uppercase text-[10px] tracking-wider">PAYDEX Commercial Score</div>
+                <div className="font-mono text-2xl font-bold text-[#e6e6e6] flex items-center gap-2">
+                  {company.paydexScore} <span className="text-xs text-[#777777] font-normal">/ 100</span>
                 </div>
               </div>
-              <div className="border-l border-[var(--cds-border-subtle)] pl-4">
-                <div className="text-[var(--cds-text-helper)] uppercase text-[10px] tracking-wider">Payment Behavior</div>
-                <div className="font-semibold text-[#42be65]">PROMPT (DBT +4)</div>
+              <div className="border-l border-[#202026] pl-4">
+                <div className="text-[#777777] uppercase text-[10px] tracking-wider">Payment Behavior</div>
+                <div className="font-semibold text-[#24a148]">PROMPT (DBT +4)</div>
               </div>
             </div>
           </div>

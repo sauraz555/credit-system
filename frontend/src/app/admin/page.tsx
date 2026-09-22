@@ -22,8 +22,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
   Tabs,
   TabList,
   Tab,
@@ -173,50 +171,15 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-[1680px] mx-auto">
-      {/* Breadcrumb & Global Action Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-3 border-b border-[var(--cds-border-subtle)]">
-        <Breadcrumb noTrailingSlash>
-          <BreadcrumbItem>
-            <Link href="/" className="text-[var(--cds-link-primary)] hover:underline">CRMS Root</Link>
-          </BreadcrumbItem>
-          <BreadcrumbItem isCurrentPage className="font-mono text-white">
-            Analyst & Governance Console
-          </BreadcrumbItem>
-        </Breadcrumb>
-
-        <div className="flex items-center gap-3 text-xs">
-          <Tag type="magenta" size="sm" className="font-mono m-0">PART IIIA GOVERNANCE</Tag>
-          <Tag type="blue" size="sm" className="font-mono m-0">ALGORITHM AUDIT PASS</Tag>
-        </div>
-      </div>
-
-      {/* Header */}
-      <div className="bg-[var(--cds-layer-01)] border border-[var(--cds-border-subtle)] p-5 mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-1.5">
-              <h1 className="text-2xl md:text-3xl font-light text-white tracking-tight">
-                Supervisory & Risk Analyst Console
-              </h1>
-              <Tag type="green" size="sm" className="font-mono m-0">PRODUCTION V1.0 ACTIVE</Tag>
-            </div>
-            <p className="text-xs text-[var(--cds-text-secondary)]">
-              Scoring algorithm governance, bitemporal model versioning, statutory dispute adjudication, and systemic contagion analysis.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs font-mono bg-[var(--cds-layer-02)] px-4 py-3 border border-[var(--cds-border-subtle)]">
-            <div>
-              <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Statutory Disputes</div>
-              <div className="text-[#f1c21b] font-bold">{disputes.filter(d => d.daysRemaining > 0).length} Open (30d SLA)</div>
-            </div>
-            <div className="border-l border-[var(--cds-border-subtle)] pl-4">
-              <div className="text-[var(--cds-text-helper)] uppercase text-[10px]">Algorithm Gini</div>
-              <div className="text-[#42be65] font-bold">0.684 (Calibrated)</div>
-            </div>
-          </div>
-        </div>
+    <div>
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-light text-[#e6e6e6] tracking-tight">
+          Governance & Calibration
+        </h1>
+        <p className="text-xs text-[#999999] mt-1">
+          Scoring algorithm governance, bitemporal model versioning, statutory dispute adjudication, and systemic contagion analysis.
+        </p>
       </div>
 
       {/* Notification banner on deployment */}
